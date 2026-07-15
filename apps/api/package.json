@@ -7,11 +7,19 @@
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "build": "tsc",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
+    "db:generate": "prisma generate"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
+    "prisma": "^7.8.0",
     "tsx": "^4.19.0",
     "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@prisma/client": "^7.8.0",
+    "dotenv": "^17.4.2"
   }
 }

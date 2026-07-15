@@ -1,0 +1,273 @@
+// Portl — full database schema
+// All 14 entities defined up-front per Step 1.2 of the build plan.
+// PollVote has a DB-level unique constraint on (pollId, userId) — load-bearing, not optional.
+// ApprovalDecision is append-only (never updated) — audit trail by design.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  RESIDENT
+  GUARD
+  ADMIN
+}
+
+enum VisitorStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHECKED_IN
+  CHECKED_OUT
+  EXPIRED
+}
+
+enum ComplaintStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+}
+
+// ---------------------------------------------------------------------------
+// Core hierarchy: Society → Gate / Tower → Flat → User
+// ---------------------------------------------------------------------------
+
+model Society {
+  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  name      String
+  address   String
+  createdAt DateTime @default(now())
+
+  towers           Tower[]
+  gates            Gate[]
+  users            User[]
+  notices          Notice[]
+  polls            Poll[]
+  amenities        Amenity[]
+  serviceProviders ServiceProvider[]
+  amenityBookings  AmenityBooking[]
+}
+
+model Gate {
+  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  name      String
+  societyId String
+  createdAt DateTime @default(now())
+
+  society Society @relation(fields: [societyId], references: [id], onDelete: Cascade)
+  guards  User[]
+}
+
+model Tower {
+  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  name      String
+  societyId String
+  createdAt DateTime @default(now())
+
+  society Society @relation(fields: [societyId], references: [id], onDelete: Cascade)
+  flats   Flat[]
+}
+
+model Flat {
+  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  number    String
+  floor     Int?
+  towerId   String
+  createdAt DateTime @default(now())
+
+  tower            Tower            @relation(fields: [towerId], references: [id], onDelete: Cascade)
+  residents        User[]
+  visitorRequests  VisitorRequest[]
+  complaints       Complaint[]
+}
+
+// ---------------------------------------------------------------------------
+// User
+// flatId  — nullable: null for Guard / Admin, required at app layer for Resident
+// gateId  — nullable: null for Resident / Admin, required at app layer for Guard
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(dbgenerated("gen_random_uuid()"))
+  email        String   @unique
+  phone        String?
+  passwordHash String
+  role         Role
+  societyId    String
+  flatId       String?
+  gateId       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  society  Society @relation(fields: [societyId], references: [id])
+  flat     Flat?   @relation(fields: [flatId], references: [id], onDelete: SetNull)
+  gate     Gate?   @relation(fields: [gateId], references: [id], onDelete: SetNull)
+
+  createdVisitorRequests VisitorRequest[]   @relation("CreatedByGuard")
+  approvalDecisions      ApprovalDecision[] @relation("DecidedByUser")
+  createdNotices         Notice[]
+  createdPolls           Poll[]
+  pollVotes              PollVote[]
+  createdComplaints      Complaint[]
+  amenityBookings        AmenityBooking[]
+}
+
+// ---------------------------------------------------------------------------
+// Visitor flow
+// ---------------------------------------------------------------------------
+
+model VisitorRequest {
+  id               String        @id @default(dbgenerated("gen_random_uuid()"))
+  visitorName      String
+  purpose          String
+  visitorType      String
+  photoUrl         String?
+  status           VisitorStatus @default(PENDING)
+  flatId           String
+  createdByGuardId String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  flat         Flat               @relation(fields: [flatId], references: [id])
+  createdBy    User               @relation("CreatedByGuard", fields: [createdByGuardId], references: [id])
+  decisions    ApprovalDecision[]
+}
+
+// Append-only — never update a row, only insert new ones.
+// Each status transition creates a new row (who, from, to, when).
+model ApprovalDecision {
+  id               String        @id @default(dbgenerated("gen_random_uuid()"))
+  visitorRequestId String
+  decidedByUserId  String
+  fromStatus       VisitorStatus
+  toStatus         VisitorStatus
+  decidedAt        DateTime      @default(now())
+
+  visitorRequest VisitorRequest @relation(fields: [visitorRequestId], references: [id])
+  decidedBy      User           @relation("DecidedByUser", fields: [decidedByUserId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Notices
+// ---------------------------------------------------------------------------
+
+model Notice {
+  id              String   @id @default(dbgenerated("gen_random_uuid()"))
+  title           String
+  content         String
+  societyId       String
+  createdByUserId String
+  createdAt       DateTime @default(now())
+
+  society     Society @relation(fields: [societyId], references: [id])
+  createdBy   User    @relation(fields: [createdByUserId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Polls + Votes
+// ---------------------------------------------------------------------------
+
+model Poll {
+  id              String    @id @default(dbgenerated("gen_random_uuid()"))
+  question        String
+  options         Json      // String[] — array of option labels
+  societyId       String
+  createdByUserId String
+  endsAt          DateTime?
+  createdAt       DateTime  @default(now())
+
+  society   Society    @relation(fields: [societyId], references: [id])
+  createdBy User       @relation(fields: [createdByUserId], references: [id])
+  votes     PollVote[]
+}
+
+model PollVote {
+  id             String   @id @default(dbgenerated("gen_random_uuid()"))
+  pollId         String
+  userId         String
+  selectedOption String   // must be one of Poll.options — enforced at service layer
+  createdAt      DateTime @default(now())
+
+  poll Poll @relation(fields: [pollId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  // DB-level unique constraint: one vote per user per poll.
+  // This is load-bearing — prevents double-voting even under a concurrent race.
+  @@unique([pollId, userId])
+}
+
+// ---------------------------------------------------------------------------
+// Complaints (state machine mirrors visitor flow pattern)
+// ---------------------------------------------------------------------------
+
+model Complaint {
+  id              String          @id @default(dbgenerated("gen_random_uuid()"))
+  title           String
+  description     String
+  status          ComplaintStatus @default(OPEN)
+  flatId          String
+  createdByUserId String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  flat      Flat @relation(fields: [flatId], references: [id])
+  createdBy User @relation(fields: [createdByUserId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Amenities + Bookings
+// version column enables optimistic locking (arch doc §7)
+// Double-booking prevention is handled in prisma.$transaction at the service layer (Step 4.4)
+// ---------------------------------------------------------------------------
+
+model Amenity {
+  id          String   @id @default(dbgenerated("gen_random_uuid()"))
+  name        String
+  description String?
+  societyId   String
+  version     Int      @default(0) // optimistic lock field
+  createdAt   DateTime @default(now())
+
+  society  Society          @relation(fields: [societyId], references: [id])
+  bookings AmenityBooking[]
+}
+
+model AmenityBooking {
+  id            String   @id @default(dbgenerated("gen_random_uuid()"))
+  amenityId     String
+  bookedByUserId String
+  date          DateTime // the calendar date of the booking
+  startTime     DateTime // full timestamp
+  endTime       DateTime // full timestamp
+  societyId     String
+  createdAt     DateTime @default(now())
+
+  amenity    Amenity @relation(fields: [amenityId], references: [id])
+  bookedBy   User    @relation(fields: [bookedByUserId], references: [id])
+  society    Society @relation(fields: [societyId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Service Providers — CRUD only, no ratings/reviews (arch doc §9)
+// ---------------------------------------------------------------------------
+
+model ServiceProvider {
+  id        String   @id @default(dbgenerated("gen_random_uuid()"))
+  name      String
+  category  String
+  phone     String
+  notes     String?
+  societyId String
+  createdAt DateTime @default(now())
+
+  society Society @relation(fields: [societyId], references: [id])
+}
