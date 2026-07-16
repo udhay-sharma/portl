@@ -1,18 +1,28 @@
-import { createServer } from "node:http";
+import 'dotenv/config';
+import Fastify from 'fastify';
+import sensible from '@fastify/sensible';
+import authRoutes from './routes/auth.js';
 
 const PORT = 3000;
 
-const server = createServer((req, res) => {
-  if (req.method === "GET" && req.url === "/health") {
-    res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ status: "ok" }));
-    return;
-  }
+const fastify = Fastify({ logger: true });
 
-  res.writeHead(404);
-  res.end();
+// Plugins
+await fastify.register(sensible);
+
+// Routes
+await fastify.register(authRoutes);
+
+// Health check — kept from Step 1.1, same contract: GET /health → { status: "ok" }
+fastify.get('/health', async (_request, _reply) => {
+  return { status: 'ok' };
 });
 
-server.listen(PORT, () => {
+// Start
+try {
+  await fastify.listen({ port: PORT, host: '0.0.0.0' });
   console.log(`API listening on http://localhost:${PORT}`);
-});
+} catch (err) {
+  fastify.log.error(err);
+  process.exit(1);
+}

@@ -98,6 +98,7 @@ model Flat {
 
 model User {
   id           String   @id @default(dbgenerated("gen_random_uuid()"))
+  name         String
   email        String   @unique
   phone        String?
   passwordHash String
