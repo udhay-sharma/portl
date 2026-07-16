@@ -15,7 +15,8 @@
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
     "test:rbac": "node --test --import tsx/esm src/test/rbac.test.ts",
-    "test:seed": "node --test --import tsx/esm src/test/seed.test.ts"
+    "test:seed": "node --test --import tsx/esm src/test/seed.test.ts",
+    "test:visitor-create": "node --test --import tsx/esm src/test/visitor-create.test.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

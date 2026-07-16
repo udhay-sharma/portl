@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import prisma from '../lib/prisma.js';
+import { VisitorRequestSchema } from '@portl/shared';
 import { requireAuth, requireRole } from '../middleware/auth.middleware.js';
 
 const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
@@ -39,6 +40,48 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return reply.status(200).send({ visitorRequests });
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // POST /visitor-requests
+  // Step 2.1: Guard-only endpoint to create a visitor request.
+  // Validates input with VisitorRequestSchema from @portl/shared.
+  // Status defaults to PENDING at the database/Prisma schema level.
+  // -------------------------------------------------------------------------
+  fastify.post(
+    '/visitor-requests',
+    { preHandler: [requireAuth, requireRole('GUARD')] },
+    async (request, reply) => {
+      const parsed = VisitorRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parsed.error.flatten().fieldErrors,
+        });
+      }
+
+      // Check if flat exists to return clean 400 rather than 500 foreign key crash
+      const flat = await prisma.flat.findUnique({
+        where: { id: parsed.data.flatId },
+      });
+      if (!flat) {
+        return reply.status(400).send({ error: 'Flat not found' });
+      }
+
+      const visitorRequest = await prisma.visitorRequest.create({
+        data: {
+          visitorName: parsed.data.name,
+          purpose: parsed.data.purpose,
+          visitorType: parsed.data.visitorType,
+          photoUrl: parsed.data.photoUrl ?? null,
+          flatId: parsed.data.flatId,
+          createdByGuardId: request.user.userId,
+          // status is intentionally omitted so Prisma/Postgres apply @default(PENDING)
+        },
+      });
+
+      return reply.status(201).send({ visitorRequest });
     },
   );
 };
