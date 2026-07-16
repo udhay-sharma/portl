@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
@@ -11,7 +14,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "db:generate": "prisma generate",
-    "test:rbac": "node --test --import tsx/esm src/test/rbac.test.ts"
+    "test:rbac": "node --test --import tsx/esm src/test/rbac.test.ts",
+    "test:seed": "node --test --import tsx/esm src/test/seed.test.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
