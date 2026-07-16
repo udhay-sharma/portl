@@ -22,3 +22,16 @@ export const VisitorRequestSchema = z.object({
 });
 
 export type VisitorRequestInput = z.infer<typeof VisitorRequestSchema>;
+
+// ---------------------------------------------------------------------------
+// UpdateVisitorStatusSchema
+// Step 2.2: Zod validation schema for PATCH status update.
+// ---------------------------------------------------------------------------
+export const UpdateVisitorStatusSchema = z.object({
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CHECKED_IN', 'CHECKED_OUT', 'EXPIRED'], {
+    required_error: 'Status is required',
+    message: 'Status must be PENDING, APPROVED, REJECTED, CHECKED_IN, CHECKED_OUT, or EXPIRED',
+  }),
+});
+
+export type UpdateVisitorStatusInput = z.infer<typeof UpdateVisitorStatusSchema>;

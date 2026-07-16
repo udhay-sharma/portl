@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import prisma from '../lib/prisma.js';
-import { VisitorRequestSchema } from '@portl/shared';
+import { VisitorRequestSchema, UpdateVisitorStatusSchema, assertValidTransition } from '@portl/shared';
 import { requireAuth, requireRole } from '../middleware/auth.middleware.js';
 
 const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
@@ -82,6 +82,55 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
       });
 
       return reply.status(201).send({ visitorRequest });
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // PATCH /visitor-requests/:id
+  // Step 2.2: Updates visitor request status using the state machine.
+  // Calls assertValidTransition() BEFORE any database write happens.
+  // Protected by requireAuth for now (role logic added in Step 2.3).
+  // -------------------------------------------------------------------------
+  fastify.patch<{ Params: { id: string } }>(
+    '/visitor-requests/:id',
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const parsed = UpdateVisitorStatusSchema.safeParse(request.body);
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parsed.error.flatten().fieldErrors,
+        });
+      }
+
+      const { id } = request.params;
+      const visitorRequest = await prisma.visitorRequest.findUnique({
+        where: { id },
+      });
+
+      if (!visitorRequest) {
+        return reply.status(404).send({ error: 'Visitor request not found' });
+      }
+
+      // State machine validation strictly BEFORE any database update
+      try {
+        assertValidTransition(visitorRequest.status, parsed.data.status);
+      } catch (err) {
+        return reply.status(400).send({
+          error: 'Invalid transition',
+          message:
+            err instanceof Error ? err.message : 'Invalid status transition',
+          currentStatus: visitorRequest.status,
+          requestedStatus: parsed.data.status,
+        });
+      }
+
+      const updated = await prisma.visitorRequest.update({
+        where: { id },
+        data: { status: parsed.data.status },
+      });
+
+      return reply.status(200).send({ visitorRequest: updated });
     },
   );
 };
