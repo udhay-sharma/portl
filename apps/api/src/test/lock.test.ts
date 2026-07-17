@@ -48,7 +48,11 @@ after(async () => {
     where: { flatId: FLAT_ID },
   });
 
-  await redis.quit();
+  if (redis.status !== 'end' && redis.status !== 'close') {
+    await redis.quit().catch(() => {
+      redis.disconnect();
+    });
+  }
   await app.close();
   await prisma.$disconnect();
 });

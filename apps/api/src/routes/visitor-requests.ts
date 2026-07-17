@@ -85,6 +85,7 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
+      let visitorRequest = null;
       try {
         // Check if flat exists to return clean 400 rather than 500 foreign key crash
         const flat = await prisma.flat.findUnique({
@@ -94,7 +95,7 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
           return reply.status(400).send({ error: 'Flat not found' });
         }
 
-        const visitorRequest = await prisma.visitorRequest.create({
+        visitorRequest = await prisma.visitorRequest.create({
           data: {
             visitorName: parsed.data.name,
             purpose: parsed.data.purpose,
@@ -105,8 +106,6 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
             // status is intentionally omitted so Prisma/Postgres apply @default(PENDING)
           },
         });
-
-        return reply.status(201).send({ visitorRequest });
       } finally {
         if (lockAcquired) {
           try {
@@ -116,6 +115,13 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
           }
         }
       }
+
+      if (visitorRequest) {
+        // Step 2.5: On successful POST /visitor-requests (after the lock is released and the row is created),
+        // emit 'visitor:new' event containing the created visitor request to flat:{flatId} room.
+        fastify.io?.to(`flat:${visitorRequest.flatId}`).emit('visitor:new', visitorRequest);
+        return reply.status(201).send({ visitorRequest });
+      }
     },
   );
 
@@ -124,6 +130,7 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
   // Step 2.2: Updates visitor request status using the state machine.
   // Calls assertValidTransition() BEFORE any database write happens.
   // Protected by requireAuth for now (role logic added in Step 2.3).
+  // Step 2.5: Emits 'visitor:decided' event to flat:{flatId} room on success.
   // -------------------------------------------------------------------------
   fastify.patch<{ Params: { id: string } }>(
     '/visitor-requests/:id',
@@ -175,6 +182,9 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
         where: { id },
         data: { status: parsed.data.status },
       });
+
+      // Step 2.5: On successful status change, emit 'visitor:decided' to flat:{flatId} room.
+      fastify.io?.to(`flat:${updated.flatId}`).emit('visitor:decided', updated);
 
       return reply.status(200).send({ visitorRequest: updated });
     },

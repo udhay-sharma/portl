@@ -3,6 +3,7 @@ import sensible from '@fastify/sensible';
 import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
 import visitorRequestRoutes from './routes/visitor-requests.js';
+import socketPlugin from './plugins/socket.js';
 import redis from './lib/redis.js';
 
 // ---------------------------------------------------------------------------
@@ -15,6 +16,7 @@ export async function createApp(): Promise<FastifyInstance> {
 
   // Plugins
   await fastify.register(sensible);
+  await fastify.register(socketPlugin);
 
   // Routes
   await fastify.register(authRoutes);
@@ -28,8 +30,10 @@ export async function createApp(): Promise<FastifyInstance> {
 
   // Ensure Redis singleton closes when app closes (prevents open handles in tests/shutdown)
   fastify.addHook('onClose', async () => {
-    if (redis.status !== 'end') {
-      await redis.quit();
+    if (redis.status !== 'end' && redis.status !== 'close') {
+      await redis.quit().catch(() => {
+        redis.disconnect();
+      });
     }
   });
 
