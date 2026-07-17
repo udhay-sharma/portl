@@ -17,10 +17,12 @@
     "test:rbac": "node --test --import tsx/esm src/test/rbac.test.ts",
     "test:seed": "node --test --import tsx/esm src/test/seed.test.ts",
     "test:visitor-create": "node --test --import tsx/esm src/test/visitor-create.test.ts",
-    "test:state-machine": "node --test --import tsx/esm src/test/state-machine.test.ts"
+    "test:state-machine": "node --test --import tsx/esm src/test/state-machine.test.ts",
+    "test:lock": "node --test --import tsx/esm src/test/lock.test.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
+    "@types/ioredis": "^4.28.10",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.10.0",
     "@types/pg": "^8.20.0",
@@ -36,6 +38,7 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "fastify": "^5.10.0",
+    "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
     "pg": "^8.22.0"
   }

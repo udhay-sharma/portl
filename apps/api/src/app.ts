@@ -3,6 +3,7 @@ import sensible from '@fastify/sensible';
 import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
 import visitorRequestRoutes from './routes/visitor-requests.js';
+import redis from './lib/redis.js';
 
 // ---------------------------------------------------------------------------
 // createApp — builds and configures the Fastify instance without starting it.
@@ -23,6 +24,13 @@ export async function createApp(): Promise<FastifyInstance> {
   // Health check — same contract as Step 1.1: GET /health → { status: "ok" }
   fastify.get('/health', async (_request, _reply) => {
     return { status: 'ok' };
+  });
+
+  // Ensure Redis singleton closes when app closes (prevents open handles in tests/shutdown)
+  fastify.addHook('onClose', async () => {
+    if (redis.status !== 'end') {
+      await redis.quit();
+    }
   });
 
   return fastify;

@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import prisma from '../lib/prisma.js';
+import redis from '../lib/redis.js';
 import { VisitorRequestSchema, UpdateVisitorStatusSchema, assertValidTransition } from '@portl/shared';
 import { requireAuth, requireRole } from '../middleware/auth.middleware.js';
 
@@ -48,6 +49,8 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
   // Step 2.1: Guard-only endpoint to create a visitor request.
   // Validates input with VisitorRequestSchema from @portl/shared.
   // Status defaults to PENDING at the database/Prisma schema level.
+  // Step 2.4: Wraps creation in a Redis distributed lock (SET NX PX 5000)
+  // keyed on lock:flat:{flatId} with try/finally release guarantee.
   // -------------------------------------------------------------------------
   fastify.post(
     '/visitor-requests',
@@ -61,27 +64,58 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      // Check if flat exists to return clean 400 rather than 500 foreign key crash
-      const flat = await prisma.flat.findUnique({
-        where: { id: parsed.data.flatId },
-      });
-      if (!flat) {
-        return reply.status(400).send({ error: 'Flat not found' });
+      const lockKey = `lock:flat:${parsed.data.flatId}`;
+      let lockAcquired = false;
+
+      try {
+        const result = await redis.set(lockKey, '1', 'PX', 5000, 'NX');
+        if (result === 'OK') {
+          lockAcquired = true;
+        }
+      } catch (err) {
+        // Rule 4: If Redis is unreachable, return a clean 503 Service Unavailable
+        return reply.status(503).send({
+          error: 'Service temporarily unavailable: unable to acquire distributed lock (Redis unreachable)',
+        });
       }
 
-      const visitorRequest = await prisma.visitorRequest.create({
-        data: {
-          visitorName: parsed.data.name,
-          purpose: parsed.data.purpose,
-          visitorType: parsed.data.visitorType,
-          photoUrl: parsed.data.photoUrl ?? null,
-          flatId: parsed.data.flatId,
-          createdByGuardId: request.user.userId,
-          // status is intentionally omitted so Prisma/Postgres apply @default(PENDING)
-        },
-      });
+      if (!lockAcquired) {
+        return reply.status(409).send({
+          error: 'Conflict: another visitor request for this flat is currently being processed',
+        });
+      }
 
-      return reply.status(201).send({ visitorRequest });
+      try {
+        // Check if flat exists to return clean 400 rather than 500 foreign key crash
+        const flat = await prisma.flat.findUnique({
+          where: { id: parsed.data.flatId },
+        });
+        if (!flat) {
+          return reply.status(400).send({ error: 'Flat not found' });
+        }
+
+        const visitorRequest = await prisma.visitorRequest.create({
+          data: {
+            visitorName: parsed.data.name,
+            purpose: parsed.data.purpose,
+            visitorType: parsed.data.visitorType,
+            photoUrl: parsed.data.photoUrl ?? null,
+            flatId: parsed.data.flatId,
+            createdByGuardId: request.user.userId,
+            // status is intentionally omitted so Prisma/Postgres apply @default(PENDING)
+          },
+        });
+
+        return reply.status(201).send({ visitorRequest });
+      } finally {
+        if (lockAcquired) {
+          try {
+            await redis.del(lockKey);
+          } catch (delErr) {
+            console.error('[Redis Cleanup Error] Failed to release lock:', delErr);
+          }
+        }
+      }
     },
   );
 
