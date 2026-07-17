@@ -145,6 +145,43 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const { id } = request.params;
+
+      // Step 2.6: Check idempotencyKey in Redis BEFORE processing transition
+      const idempotencyKey = parsed.data.idempotencyKey;
+      if (idempotencyKey) {
+        const cacheKey = `idempotency:patch-visitor:${idempotencyKey}`;
+        try {
+          const cachedRaw = await redis.get(cacheKey);
+          if (cachedRaw) {
+            const cached = JSON.parse(cachedRaw) as {
+              request: { id: string; status: string; userId: string };
+              response: { statusCode: number; body: unknown };
+            };
+
+            // Rule 4a: Check if same idempotencyKey is reused for a different request body/target
+            if (
+              cached.request.id !== id ||
+              cached.request.status !== parsed.data.status ||
+              cached.request.userId !== request.user.userId
+            ) {
+              return reply.status(409).send({
+                error: 'Idempotency conflict',
+                message:
+                  'This idempotency key has already been used for a different request',
+              });
+            }
+
+            // Exactly matching replay: return cached response without touching DB or assertValidTransition
+            return reply.status(cached.response.statusCode).send(cached.response.body);
+          }
+        } catch (redisErr) {
+          fastify.log.error({ err: redisErr }, 'Redis idempotency get failed');
+          return reply.status(503).send({
+            error: 'Service Unavailable: Redis connection failed',
+          });
+        }
+      }
+
       const visitorRequest = await prisma.visitorRequest.findUnique({
         where: { id },
       });
@@ -186,7 +223,34 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
       // Step 2.5: On successful status change, emit 'visitor:decided' to flat:{flatId} room.
       fastify.io?.to(`flat:${updated.flatId}`).emit('visitor:decided', updated);
 
-      return reply.status(200).send({ visitorRequest: updated });
+      const responseBody = { visitorRequest: updated };
+
+      // Step 2.6: Store successful response in Redis with 300s TTL (Rule 4b)
+      if (idempotencyKey) {
+        const cacheKey = `idempotency:patch-visitor:${idempotencyKey}`;
+        try {
+          await redis.set(
+            cacheKey,
+            JSON.stringify({
+              request: {
+                id,
+                status: parsed.data.status,
+                userId: request.user.userId,
+              },
+              response: {
+                statusCode: 200,
+                body: responseBody,
+              },
+            }),
+            'EX',
+            300, // 5 minutes TTL
+          );
+        } catch (redisErr) {
+          fastify.log.error({ err: redisErr }, 'Redis idempotency set failed');
+        }
+      }
+
+      return reply.status(200).send(responseBody);
     },
   );
 };

@@ -19,7 +19,8 @@
     "test:visitor-create": "node --test --import tsx/esm src/test/visitor-create.test.ts",
     "test:state-machine": "node --test --import tsx/esm src/test/state-machine.test.ts",
     "test:lock": "node --test --import tsx/esm src/test/lock.test.ts",
-    "test:socket": "node --test --import tsx/esm src/test/socket.test.ts"
+    "test:socket": "node --test --import tsx/esm src/test/socket.test.ts",
+    "test:idempotency": "node --test --import tsx/esm src/test/idempotency.test.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

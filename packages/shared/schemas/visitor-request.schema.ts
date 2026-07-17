@@ -32,6 +32,7 @@ export const UpdateVisitorStatusSchema = z.object({
     required_error: 'Status is required',
     message: 'Status must be PENDING, APPROVED, REJECTED, CHECKED_IN, CHECKED_OUT, or EXPIRED',
   }),
+  idempotencyKey: z.string().optional(),
 });
 
 export type UpdateVisitorStatusInput = z.infer<typeof UpdateVisitorStatusSchema>;
