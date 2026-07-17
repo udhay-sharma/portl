@@ -15,6 +15,7 @@
 import 'dotenv/config';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
+import { execSync } from 'node:child_process';
 import type { FastifyInstance } from 'fastify';
 import { createApp } from '../app.js';
 import prisma from '../lib/prisma.js';
@@ -25,6 +26,7 @@ import prisma from '../lib/prisma.js';
 
 let app: FastifyInstance;
 let tokenA: string;
+let guardToken: string;
 let flatIdA: string;
 let flatIdB: string;
 let societyId: string;
@@ -35,6 +37,8 @@ let towerId: string;
 // ---------------------------------------------------------------------------
 
 before(async () => {
+  execSync('npx prisma db seed', { stdio: 'pipe' });
+
   app = await createApp();
   await app.ready();
 
@@ -94,6 +98,15 @@ before(async () => {
   });
   assert.equal(loginA.statusCode, 200, `Login A failed: ${loginA.body}`);
   tokenA = (JSON.parse(loginA.body) as { accessToken: string }).accessToken;
+
+  // 7. Login as Guard → get token
+  const loginGuard = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { credential: 'guard@portl.dev', password: 'password123' },
+  });
+  assert.equal(loginGuard.statusCode, 200, `Login Guard failed: ${loginGuard.body}`);
+  guardToken = (JSON.parse(loginGuard.body) as { accessToken: string }).accessToken;
 });
 
 // ---------------------------------------------------------------------------
@@ -101,6 +114,10 @@ before(async () => {
 // ---------------------------------------------------------------------------
 
 after(async () => {
+  // Clean up any visitor requests created during rbac tests for flat A and B
+  await prisma.visitorRequest.deleteMany({
+    where: { flatId: { in: [flatIdA, flatIdB] } },
+  });
   // Users first (FK to Society; Society → restrict by default)
   await prisma.user.deleteMany({
     where: { email: { in: ['rbac.resident.a@test.portl', 'rbac.resident.b@test.portl'] } },
@@ -185,4 +202,71 @@ test('Lock 2 — GET /me with a tampered/invalid token returns 401', async () =>
     headers: { authorization: 'Bearer this.is.not.a.valid.token' },
   });
   assert.equal(res.statusCode, 401, `Expected 401 for tampered token, got ${res.statusCode}`);
+});
+
+test('Step 2.3 Lock 3 — Resident A tries to PATCH a visitor request belonging to Flat B -> expect 403', async () => {
+  // 1. Guard creates a visitor request for Flat B
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/visitor-requests',
+    headers: { authorization: `Bearer ${guardToken}` },
+    payload: {
+      name: 'Unauthorized Visitor',
+      purpose: 'Visiting Flat B',
+      visitorType: 'Guest',
+      flatId: flatIdB,
+    },
+  });
+  assert.equal(createRes.statusCode, 201, `Failed to create visitor request for Flat B: ${createRes.body}`);
+  const vrB = (JSON.parse(createRes.body) as { visitorRequest: { id: string } }).visitorRequest;
+
+  // 2. Resident A tries to PATCH Flat B's visitor request
+  const patchRes = await app.inject({
+    method: 'PATCH',
+    url: `/visitor-requests/${vrB.id}`,
+    headers: { authorization: `Bearer ${tokenA}` },
+    payload: { status: 'APPROVED' },
+  });
+
+  assert.equal(patchRes.statusCode, 403, `Expected 403 Forbidden, got ${patchRes.statusCode}: ${patchRes.body}`);
+  const errorBody = JSON.parse(patchRes.body) as { error: string };
+  assert.match(errorBody.error, /Forbidden/);
+
+  // 3. Verify in database that status remains PENDING
+  const dbRow = await prisma.visitorRequest.findUniqueOrThrow({ where: { id: vrB.id } });
+  assert.equal(dbRow.status, 'PENDING');
+});
+
+test('Step 2.3 Lock 3 — Resident A\'s GET /visitor-requests never includes Flat B\'s requests when both exist', async () => {
+  // 1. Guard creates a visitor request for Flat A
+  const createResA = await app.inject({
+    method: 'POST',
+    url: '/visitor-requests',
+    headers: { authorization: `Bearer ${guardToken}` },
+    payload: {
+      name: 'Authorized Visitor',
+      purpose: 'Visiting Flat A',
+      visitorType: 'Guest',
+      flatId: flatIdA,
+    },
+  });
+  assert.equal(createResA.statusCode, 201, `Failed to create visitor request for Flat A: ${createResA.body}`);
+  const vrA = (JSON.parse(createResA.body) as { visitorRequest: { id: string } }).visitorRequest;
+
+  // 2. Resident A calls GET /visitor-requests
+  const getRes = await app.inject({
+    method: 'GET',
+    url: '/visitor-requests',
+    headers: { authorization: `Bearer ${tokenA}` },
+  });
+
+  assert.equal(getRes.statusCode, 200, `Expected 200 OK, got ${getRes.statusCode}: ${getRes.body}`);
+  const body = JSON.parse(getRes.body) as { visitorRequests: Array<{ id: string; flatId: string }> };
+
+  // 3. Assert Flat A's request is present and Flat B's request is NOT present
+  assert.ok(body.visitorRequests.some((vr) => vr.id === vrA.id), 'Flat A request should be in the response');
+  assert.equal(body.visitorRequests.some((vr) => vr.flatId === flatIdB), false, 'Flat B request MUST NOT be in Resident A\'s response');
+  for (const vr of body.visitorRequests) {
+    assert.equal(vr.flatId, flatIdA, `Every request must belong to Flat A (${flatIdA})`);
+  }
 });

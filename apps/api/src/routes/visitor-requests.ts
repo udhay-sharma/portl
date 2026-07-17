@@ -112,6 +112,18 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(404).send({ error: 'Visitor request not found' });
       }
 
+      // Step 2.3: Resident row-level scoping check
+      // Residents can only modify visitor requests linked to their own flatId from their verified JWT.
+      if (
+        request.user.role === 'RESIDENT' &&
+        visitorRequest.flatId !== request.user.flatId
+      ) {
+        return reply.status(403).send({
+          error:
+            'Forbidden: you do not have permission to modify visitor requests for this flat',
+        });
+      }
+
       // State machine validation strictly BEFORE any database update
       try {
         assertValidTransition(visitorRequest.status, parsed.data.status);
