@@ -14,6 +14,16 @@ import redis from './lib/redis.js';
 export async function createApp(): Promise<FastifyInstance> {
   const fastify = Fastify({ logger: true });
 
+  // Enable CORS for Expo Web / mobile LAN clients
+  fastify.addHook('onRequest', async (request, reply) => {
+    reply.header('Access-Control-Allow-Origin', '*');
+    reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    reply.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    if (request.method === 'OPTIONS') {
+      reply.status(200).send();
+    }
+  });
+
   // Plugins
   await fastify.register(sensible);
   await fastify.register(socketPlugin);
