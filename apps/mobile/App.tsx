@@ -1,7 +1,7 @@
 import './global.css';
 import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaView, View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView, View, Text, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { login, type UserProfile, type VisitorRequest } from './src/lib/api';
 import { GuardCreateVisitorScreen } from './src/screens/GuardCreateVisitorScreen';
 import { ResidentIncomingRequestsScreen } from './src/screens/ResidentIncomingRequestsScreen';
