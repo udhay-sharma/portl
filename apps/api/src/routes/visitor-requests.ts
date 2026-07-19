@@ -3,6 +3,7 @@ import prisma from '../lib/prisma.js';
 import redis from '../lib/redis.js';
 import { VisitorRequestSchema, UpdateVisitorStatusSchema, assertValidTransition } from '@portl/shared';
 import { requireAuth, requireRole } from '../middleware/auth.middleware.js';
+import { visitorNotificationQueue, PUSH_NOTIFICATION_DELAY_MS } from '../workers/visitor-notification.worker.js';
 
 const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
   // -------------------------------------------------------------------------
@@ -120,6 +121,16 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
         // Step 2.5: On successful POST /visitor-requests (after the lock is released and the row is created),
         // emit 'visitor:new' event containing the created visitor request to flat:{flatId} room.
         fastify.io?.to(`flat:${visitorRequest.flatId}`).emit('visitor:new', visitorRequest);
+
+        // Step 3.1: Enqueue a delayed push notification job.
+        // The worker re-checks status at fire time — if the resident already
+        // responded via socket, the job exits cleanly without sending anything.
+        await visitorNotificationQueue.add(
+          'notify-resident',
+          { visitorRequestId: visitorRequest.id, flatId: visitorRequest.flatId },
+          { delay: PUSH_NOTIFICATION_DELAY_MS },
+        );
+
         return reply.status(201).send({ visitorRequest });
       }
     },

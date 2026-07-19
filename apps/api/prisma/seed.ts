@@ -94,6 +94,11 @@ async function main() {
       societyId: SOCIETY_ID,
       flatId: FLAT_ID,
       gateId: null,
+      // Step 3.1: Dummy token for local push notification testing.
+      // The worker will attempt to send to this token; Expo will reject it as invalid,
+      // but the [PUSH SENT] log line will confirm the "push fires" branch ran correctly.
+      // Replace with a real ExponentPushToken[...] for a genuine device notification.
+      expoPushToken: 'ExponentPushToken[dummy_resident_token_for_step_3_1]',
     },
     create: {
       name: 'Alice Resident',
@@ -104,6 +109,7 @@ async function main() {
       societyId: SOCIETY_ID,
       flatId: FLAT_ID,
       gateId: null,
+      expoPushToken: 'ExponentPushToken[dummy_resident_token_for_step_3_1]',
     },
   });
   console.log(`  ✅ User [RESIDENT]: ${residentUser.email} (flatId: ${residentUser.flatId})`);

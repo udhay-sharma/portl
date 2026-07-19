@@ -104,10 +104,11 @@ model User {
   passwordHash String
   role         Role
   societyId    String
-  flatId       String?
-  gateId       String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  flatId        String?
+  gateId        String?
+  expoPushToken String?   // Step 3.1: Expo push token for fallback push notifications
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   society  Society @relation(fields: [societyId], references: [id])
   flat     Flat?   @relation(fields: [flatId], references: [id], onDelete: SetNull)

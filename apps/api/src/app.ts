@@ -5,6 +5,7 @@ import meRoutes from './routes/me.js';
 import visitorRequestRoutes from './routes/visitor-requests.js';
 import socketPlugin from './plugins/socket.js';
 import redis from './lib/redis.js';
+import { closeWorker } from './workers/visitor-notification.worker.js';
 
 // ---------------------------------------------------------------------------
 // createApp — builds and configures the Fastify instance without starting it.
@@ -38,8 +39,11 @@ export async function createApp(): Promise<FastifyInstance> {
     return { status: 'ok' };
   });
 
-  // Ensure Redis singleton closes when app closes (prevents open handles in tests/shutdown)
+  // Ensure Redis singleton and BullMQ worker close cleanly on app shutdown
   fastify.addHook('onClose', async () => {
+    // Step 3.1: Close BullMQ worker and queue before Redis
+    await closeWorker();
+
     if (redis.status !== 'end' && redis.status !== 'close') {
       await redis.quit().catch(() => {
         redis.disconnect();
