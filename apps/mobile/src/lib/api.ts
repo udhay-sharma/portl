@@ -3,12 +3,16 @@ import Constants from 'expo-constants';
 import type { VisitorRequestInput, UpdateVisitorStatusInput } from '@portl/shared';
 
 function getApiBaseUrl(): string {
-  // 1. If running in Expo Go or Expo dev build over Wi-Fi/LAN, extract the exact host IP address (e.g. 192.168.1.11)
+  // 0. Production override — set this for EAS/APK builds, takes priority over everything below
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
+  }
+
+  // 1. If running in Expo Go or Expo dev build over Wi-Fi/LAN, extract the exact host IP address
   const hostUri =
     Constants.expoConfig?.hostUri ||
     (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
     (Constants as any).manifest?.debuggerHost;
-
   if (hostUri) {
     const ip = hostUri.split(':')[0];
     if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
@@ -16,7 +20,7 @@ function getApiBaseUrl(): string {
     }
   }
 
-  // 2. If running on Android emulator fallback
+  // 2. Android emulator fallback
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:3000';
   }
@@ -66,7 +70,18 @@ export async function login(credential: string, password = 'password123'): Promi
     const err = await res.json().catch(() => ({ error: 'Login failed' }));
     throw new Error(err.error || err.message || 'Failed to login');
   }
-  return res.json();
+  const { accessToken } = await res.json() as { accessToken: string };
+
+  // Fetch the user profile from /me using the just-issued token
+  const meRes = await fetch(`${API_BASE_URL}/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!meRes.ok) {
+    throw new Error('Failed to load user profile');
+  }
+  const { user } = await meRes.json() as { user: UserProfile };
+
+  return { accessToken, user };
 }
 
 export async function createVisitorRequest(
