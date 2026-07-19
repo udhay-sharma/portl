@@ -6,6 +6,7 @@ import visitorRequestRoutes from './routes/visitor-requests.js';
 import socketPlugin from './plugins/socket.js';
 import redis from './lib/redis.js';
 import { closeWorker } from './workers/visitor-notification.worker.js';
+import { startExpireWorker, closeExpireWorker } from './workers/visitor-expire.worker.js';
 
 // ---------------------------------------------------------------------------
 // createApp — builds and configures the Fastify instance without starting it.
@@ -41,7 +42,8 @@ export async function createApp(): Promise<FastifyInstance> {
 
   // Ensure Redis singleton and BullMQ worker close cleanly on app shutdown
   fastify.addHook('onClose', async () => {
-    // Step 3.1: Close BullMQ worker and queue before Redis
+    // Step 3.1 & 3.2: Close BullMQ workers and queues before Redis
+    await closeExpireWorker();
     await closeWorker();
 
     if (redis.status !== 'end' && redis.status !== 'close') {
@@ -50,6 +52,10 @@ export async function createApp(): Promise<FastifyInstance> {
       });
     }
   });
+
+  // Step 3.2: Initialize the expire worker which needs the fastify instance
+  // to emit socket.io events
+  startExpireWorker(fastify);
 
   return fastify;
 }

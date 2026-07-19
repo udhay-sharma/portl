@@ -36,7 +36,7 @@ const redisConnection = parseRedisUrl(REDIS_URL);
 // Named constant — easy to change for testing vs. production.
 // Step 3.1 plan: "short delay (e.g. 10–15 seconds for now, easy to tune later)"
 // ---------------------------------------------------------------------------
-export const PUSH_NOTIFICATION_DELAY_MS = 15_000; // 15 seconds
+export const PUSH_NOTIFICATION_DELAY_MS = 120_000; // 15 seconds
 
 // ---------------------------------------------------------------------------
 // Queue — exported so POST /visitor-requests can enqueue jobs.

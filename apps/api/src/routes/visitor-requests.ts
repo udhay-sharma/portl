@@ -4,6 +4,7 @@ import redis from '../lib/redis.js';
 import { VisitorRequestSchema, UpdateVisitorStatusSchema, assertValidTransition } from '@portl/shared';
 import { requireAuth, requireRole } from '../middleware/auth.middleware.js';
 import { visitorNotificationQueue, PUSH_NOTIFICATION_DELAY_MS } from '../workers/visitor-notification.worker.js';
+import { visitorExpireQueue, EXPIRE_REQUEST_DELAY_MS } from '../workers/visitor-expire.worker.js';
 
 const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
   // -------------------------------------------------------------------------
@@ -129,6 +130,15 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
           'notify-resident',
           { visitorRequestId: visitorRequest.id, flatId: visitorRequest.flatId },
           { delay: PUSH_NOTIFICATION_DELAY_MS },
+        );
+
+        // Step 3.2: Enqueue a delayed auto-expire job.
+        // If the resident ignores the push notification and the delay passes,
+        // this job transitions the request to EXPIRED and emits a socket event.
+        await visitorExpireQueue.add(
+          'expire-request',
+          { visitorRequestId: visitorRequest.id },
+          { delay: EXPIRE_REQUEST_DELAY_MS },
         );
 
         return reply.status(201).send({ visitorRequest });
