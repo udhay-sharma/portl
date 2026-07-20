@@ -114,7 +114,15 @@ before(async () => {
 // ---------------------------------------------------------------------------
 
 after(async () => {
-  // Clean up any visitor requests created during rbac tests for flat A and B
+  // ApprovalDecision must be deleted before VisitorRequest (FK constraint, no cascade)
+  const requests = await prisma.visitorRequest.findMany({
+    where: { flatId: { in: [flatIdA, flatIdB] } },
+    select: { id: true },
+  });
+  const ids = requests.map((r) => r.id);
+  if (ids.length > 0) {
+    await prisma.approvalDecision.deleteMany({ where: { visitorRequestId: { in: ids } } });
+  }
   await prisma.visitorRequest.deleteMany({
     where: { flatId: { in: [flatIdA, flatIdB] } },
   });

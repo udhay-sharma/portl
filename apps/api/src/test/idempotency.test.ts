@@ -25,6 +25,19 @@ before(async () => {
   app = await createApp();
   await redis.connect().catch(() => {});
 
+  // Flush any stale cached idempotency keys from previous runs or a live dev server.
+  // These are the exact keys used in this test file — they must be clean before each run.
+  const staleKeys = [
+    'idempotency:patch-visitor:11111111-1111-1111-1111-111111111111',
+    'idempotency:patch-visitor:22222222-2222-2222-2222-222222222222',
+    'idempotency:patch-visitor:33333333-3333-3333-3333-333333333333',
+    'idempotency:patch-visitor:44444444-4444-4444-4444-444444444444',
+    'idempotency:patch-visitor:55555555-5555-5555-5555-555555555555',
+  ];
+  if (redis.status === 'ready') {
+    await redis.del(...staleKeys).catch(() => {});
+  }
+
   const loginRes = await app.inject({
     method: 'POST',
     url: '/auth/login',
@@ -35,9 +48,13 @@ before(async () => {
 });
 
 after(async () => {
-  await prisma.visitorRequest.deleteMany({
-    where: { flatId: FLAT_ID },
-  });
+  // ApprovalDecision must be deleted before VisitorRequest (FK constraint, no cascade)
+  const requests = await prisma.visitorRequest.findMany({ where: { flatId: FLAT_ID }, select: { id: true } });
+  const ids = requests.map((r) => r.id);
+  if (ids.length > 0) {
+    await prisma.approvalDecision.deleteMany({ where: { visitorRequestId: { in: ids } } });
+  }
+  await prisma.visitorRequest.deleteMany({ where: { flatId: FLAT_ID } });
 
   if (redis.status !== 'end' && redis.status !== 'close') {
     await redis.quit().catch(() => {
@@ -162,4 +179,54 @@ test('Step 2.6 (Rule 4a) — Reusing SAME idempotencyKey for a DIFFERENT request
   assert.equal(res2.statusCode, 409, `Expected 409 Conflict for key reuse on different parameters, got ${res2.statusCode}`);
   const body2 = JSON.parse(res2.body) as { error: string; message: string };
   assert.equal(body2.error, 'Idempotency conflict');
+});
+
+test('Step 3.4 Audit trail — Same PATCH sent twice with same idempotencyKey creates exactly 1 ApprovalDecision row (not 2)', async () => {
+  // Step 3.3 fixed the audit trail to write ApprovalDecision on every status change.
+  // This test confirms the cached-response path (same idempotencyKey) does NOT write
+  // a second audit row — only the first real execution does.
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/visitor-requests',
+    headers: { authorization: `Bearer ${guardToken}` },
+    payload: {
+      name: 'Audit Trail Visitor',
+      purpose: 'Testing audit row count',
+      visitorType: 'Guest',
+      flatId: FLAT_ID,
+    },
+  });
+  assert.equal(createRes.statusCode, 201, `Create failed: ${createRes.body}`);
+  const { visitorRequest } = JSON.parse(createRes.body) as { visitorRequest: { id: string } };
+  const key = '55555555-5555-5555-5555-555555555555';
+
+  // First PATCH — real execution, must write 1 ApprovalDecision row
+  const res1 = await app.inject({
+    method: 'PATCH',
+    url: `/visitor-requests/${visitorRequest.id}`,
+    headers: { authorization: `Bearer ${guardToken}` },
+    payload: { status: 'APPROVED', idempotencyKey: key },
+  });
+  assert.equal(res1.statusCode, 200, `First PATCH failed: ${res1.body}`);
+
+  // Second PATCH — cached response path, must NOT write another ApprovalDecision row
+  const res2 = await app.inject({
+    method: 'PATCH',
+    url: `/visitor-requests/${visitorRequest.id}`,
+    headers: { authorization: `Bearer ${guardToken}` },
+    payload: { status: 'APPROVED', idempotencyKey: key },
+  });
+  assert.equal(res2.statusCode, 200, `Second PATCH (cached) failed: ${res2.body}`);
+
+  // Verify exactly 1 ApprovalDecision row exists for this request
+  const decisions = await prisma.approvalDecision.findMany({
+    where: { visitorRequestId: visitorRequest.id },
+  });
+  assert.equal(
+    decisions.length,
+    1,
+    `Expected exactly 1 ApprovalDecision row, found ${decisions.length} — duplicate audit row was created`,
+  );
+  assert.equal(decisions[0]!.fromStatus, 'PENDING');
+  assert.equal(decisions[0]!.toStatus, 'APPROVED');
 });

@@ -64,6 +64,12 @@ after(async () => {
     clientSocket.disconnect();
   }
 
+  // ApprovalDecision must be deleted before VisitorRequest (FK constraint, no cascade)
+  const requests = await prisma.visitorRequest.findMany({ where: { flatId: FLAT_ID }, select: { id: true } });
+  const ids = requests.map((r) => r.id);
+  if (ids.length > 0) {
+    await prisma.approvalDecision.deleteMany({ where: { visitorRequestId: { in: ids } } });
+  }
   await prisma.visitorRequest.deleteMany({
     where: { flatId: FLAT_ID },
   });
