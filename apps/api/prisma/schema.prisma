@@ -149,13 +149,13 @@ model VisitorRequest {
 model ApprovalDecision {
   id               String        @id @default(dbgenerated("gen_random_uuid()"))
   visitorRequestId String
-  decidedByUserId  String
+  decidedByUserId  String?
   fromStatus       VisitorStatus
   toStatus         VisitorStatus
   decidedAt        DateTime      @default(now())
 
   visitorRequest VisitorRequest @relation(fields: [visitorRequestId], references: [id])
-  decidedBy      User           @relation("DecidedByUser", fields: [decidedByUserId], references: [id])
+  decidedBy      User?          @relation("DecidedByUser", fields: [decidedByUserId], references: [id])
 }
 
 // ---------------------------------------------------------------------------

@@ -236,10 +236,21 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const updated = await prisma.visitorRequest.update({
-        where: { id },
-        data: { status: parsed.data.status },
-      });
+      // Step 3.3: Use a transaction to guarantee an ApprovalDecision is written
+      const [updated] = await prisma.$transaction([
+        prisma.visitorRequest.update({
+          where: { id },
+          data: { status: parsed.data.status },
+        }),
+        prisma.approvalDecision.create({
+          data: {
+            visitorRequestId: id,
+            fromStatus: visitorRequest.status,
+            toStatus: parsed.data.status,
+            decidedByUserId: request.user.userId,
+          },
+        }),
+      ]);
 
       // Step 2.5: On successful status change, emit 'visitor:decided' to flat:{flatId} room.
       fastify.io?.to(`flat:${updated.flatId}`).emit('visitor:decided', updated);

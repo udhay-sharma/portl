@@ -102,11 +102,21 @@ export function startExpireWorker(fastify: FastifyInstance): void {
         return; // Should not happen given ALLOWED_TRANSITIONS, but defence-in-depth
       }
 
-      // 4. Update the VisitorRequest status to EXPIRED
-      const updated = await prisma.visitorRequest.update({
-        where: { id: visitorRequestId },
-        data: { status: 'EXPIRED' },
-      });
+      // 4. Update the VisitorRequest status to EXPIRED and write audit row
+      const [updated] = await prisma.$transaction([
+        prisma.visitorRequest.update({
+          where: { id: visitorRequestId },
+          data: { status: 'EXPIRED' },
+        }),
+        prisma.approvalDecision.create({
+          data: {
+            visitorRequestId,
+            fromStatus: visitorRequest.status,
+            toStatus: 'EXPIRED',
+            decidedByUserId: null, // System action, no human decider
+          },
+        }),
+      ]);
 
       // 5. Emit 'visitor:decided' event to flat:{flatId} room so screens update live
       fastify.io?.to(`flat:${updated.flatId}`).emit('visitor:decided', updated);
