@@ -2,8 +2,26 @@ import type { FastifyPluginAsync } from 'fastify';
 import { AmenityBookingSchema } from '@portl/shared';
 import { requireAuth, requireRole } from '../middleware/auth.middleware.js';
 import * as amenityService from '../services/amenity.service.js';
+import prisma from '../lib/prisma.js';
 
 const amenityRoutes: FastifyPluginAsync = async (fastify) => {
+  // -------------------------------------------------------------------------
+  // GET /amenities
+  // Returns amenities scoped to the caller's societyId.
+  // -------------------------------------------------------------------------
+  fastify.get(
+    '/amenities',
+    { preHandler: [requireAuth] },
+    async (request, reply) => {
+      const { societyId } = request.user;
+      const amenities = await prisma.amenity.findMany({
+        where: { societyId },
+        orderBy: { createdAt: 'desc' },
+      });
+      return reply.status(200).send({ amenities });
+    }
+  );
+
   // -------------------------------------------------------------------------
   // POST /amenities/:id/book
   // Resident only. Books a time slot for an amenity.

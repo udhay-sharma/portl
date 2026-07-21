@@ -8,6 +8,9 @@ const STATUS_STYLES: Record<string, string> = {
   CHECKED_OUT: 'bg-status-checkedout',
   REJECTED: 'bg-status-rejected',
   EXPIRED: 'bg-status-expired',
+  OPEN: 'bg-status-checkedin',       // green — complaint is open/active
+  IN_PROGRESS: 'bg-status-pending',  // amber — complaint being worked on
+  RESOLVED: 'bg-status-checkedout',  // gray — complaint resolved
 };
 
 interface StatusBadgeProps {
