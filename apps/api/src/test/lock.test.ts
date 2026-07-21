@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 /**
  * Step 2.4 — Redis distributed lock integration test
  *

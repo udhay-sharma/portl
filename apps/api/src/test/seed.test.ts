@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 /**
  * Step 1.6 — Seed script and Guard/Admin auth verification test
  *

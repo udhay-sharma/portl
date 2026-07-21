@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 /**
  * Step 2.2 — State machine (status transitions) verification test
  *

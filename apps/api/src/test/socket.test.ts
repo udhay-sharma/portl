@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 /**
  * Step 2.5 — Socket.IO Real-Time Updates Integration Test
  *

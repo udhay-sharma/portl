@@ -66,30 +66,29 @@ let worker: Worker<ExpireRequestJobData> | null = null;
 
 // Initialization function so the worker can access fastify.io for socket emits
 export function startExpireWorker(fastify: FastifyInstance): void {
-  if (worker) return; // already started
+  const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test');
+  if (worker || isTest) return;
 
   worker = new Worker<ExpireRequestJobData>(
     'visitor-expiration',
     async (job: Job<ExpireRequestJobData>) => {
       const { visitorRequestId } = job.data;
 
-      // 1. Re-fetch the visitor request
+      // 1. Re-fetch to check current status
       const visitorRequest = await prisma.visitorRequest.findUnique({
         where: { id: visitorRequestId },
       });
 
       if (!visitorRequest) {
-        console.log(
-          `[Expire Worker] visitorRequestId=${visitorRequestId} not found — skipping expiration`,
-        );
+        console.log(`[Expire Worker] visitorRequestId=${visitorRequestId} not found — skipping`);
         return;
       }
 
-      // 2. Status check — only expire if the resident hasn't already acted
+      // 2. Only expire if STILL pending
       if (visitorRequest.status !== 'PENDING') {
         console.log(
           `[Expire Worker][SKIP] visitorRequestId=${visitorRequestId} is no longer PENDING ` +
-            `(status=${visitorRequest.status}) — skipping expiration`,
+            `(status=${visitorRequest.status})`,
         );
         return;
       }
@@ -102,7 +101,7 @@ export function startExpireWorker(fastify: FastifyInstance): void {
         return; // Should not happen given ALLOWED_TRANSITIONS, but defence-in-depth
       }
 
-      // 4. Update the VisitorRequest status to EXPIRED and write audit row
+      // 4. Atomically update status to EXPIRED & write audit log
       const [updated] = await prisma.$transaction([
         prisma.visitorRequest.update({
           where: { id: visitorRequestId },
@@ -147,7 +146,6 @@ export function startExpireWorker(fastify: FastifyInstance): void {
 export async function closeExpireWorker(): Promise<void> {
   if (worker) {
     await worker.close();
-    worker = null;
   }
   await visitorExpireQueue.close();
 }

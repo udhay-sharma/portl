@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 /**
  * Step 2.6 — Idempotency Key (Replay Protection) Integration Test
  *

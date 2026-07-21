@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 /**
  * Step 3.4 — Auth register/login success and failure cases
  *

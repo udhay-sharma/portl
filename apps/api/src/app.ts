@@ -3,9 +3,10 @@ import sensible from '@fastify/sensible';
 import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
 import visitorRequestRoutes from './routes/visitor-requests.js';
+import noticeRoutes from './routes/notices.js';
 import socketPlugin from './plugins/socket.js';
 import redis from './lib/redis.js';
-import { closeWorker } from './workers/visitor-notification.worker.js';
+import { closeWorker, initPushWorker } from './workers/visitor-notification.worker.js';
 import { startExpireWorker, closeExpireWorker } from './workers/visitor-expire.worker.js';
 
 // ---------------------------------------------------------------------------
@@ -34,6 +35,8 @@ export async function createApp(): Promise<FastifyInstance> {
   await fastify.register(authRoutes);
   await fastify.register(meRoutes);
   await fastify.register(visitorRequestRoutes);
+  await fastify.register(noticeRoutes);
+
 
   // Health check — same contract as Step 1.1: GET /health → { status: "ok" }
   fastify.get('/health', async (_request, _reply) => {
@@ -53,9 +56,12 @@ export async function createApp(): Promise<FastifyInstance> {
     }
   });
 
-  // Step 3.2: Initialize the expire worker which needs the fastify instance
-  // to emit socket.io events
-  startExpireWorker(fastify);
+  // Step 3.2: Initialize the workers which need to run in dev/prod
+  const isTest = process.env.NODE_ENV === 'test' || process.env.npm_lifecycle_event?.startsWith('test');
+  if (!isTest) {
+    startExpireWorker(fastify);
+    initPushWorker();
+  }
 
   return fastify;
 }

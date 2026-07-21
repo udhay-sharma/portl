@@ -78,113 +78,122 @@ const workerConnection = {
   maxRetriesPerRequest: null as unknown as number, // required by BullMQ spec
 };
 
-const worker = new Worker<NotifyResidentJobData>(
-  'visitor-notifications',
-  async (job: Job<NotifyResidentJobData>) => {
-    const { visitorRequestId, flatId } = job.data;
+export let worker: Worker<NotifyResidentJobData> | null = null;
 
-    // 1. Re-fetch the visitor request — it may have been decided or deleted since enqueue
-    const visitorRequest = await prisma.visitorRequest.findUnique({
-      where: { id: visitorRequestId },
-    });
+export function initPushWorker(): void {
+  const isTest = process.env.NODE_ENV === 'test' || process.argv.includes('--test');
+  if (worker || isTest) return; // already initialized or in test mode
 
-    if (!visitorRequest) {
-      console.log(
-        `[Push Worker] visitorRequestId=${visitorRequestId} not found — skipping push notification`,
-      );
-      return;
-    }
+  worker = new Worker<NotifyResidentJobData>(
+    'visitor-notifications',
+    async (job: Job<NotifyResidentJobData>) => {
+      const { visitorRequestId, flatId } = job.data;
 
-    // 2. Status check — this is the core of Step 3.1.
-    //    Only send a push if the resident hasn't already acted via the socket.
-    if (visitorRequest.status !== 'PENDING') {
-      console.log(
-        `[Push Worker][SKIP] visitorRequestId=${visitorRequestId} is no longer PENDING ` +
-          `(status=${visitorRequest.status}) — skipping push notification`,
-      );
-      return;
-    }
-
-    // 3. Fetch all residents on this flat who have a stored push token
-    const residents = await prisma.user.findMany({
-      where: {
-        flatId,
-        role: 'RESIDENT',
-        expoPushToken: { not: null },
-      },
-      select: { id: true, name: true, expoPushToken: true },
-    });
-
-    if (residents.length === 0) {
-      console.log(
-        `[Push Worker] No residents with push tokens found for flatId=${flatId} — skipping`,
-      );
-      return;
-    }
-
-    // 4. Build push messages (filter invalid tokens defensively)
-    const messages: ExpoPushMessage[] = [];
-    for (const resident of residents) {
-      const token = resident.expoPushToken!;
-      if (!Expo.isExpoPushToken(token)) {
-        console.log(`[Push Worker] Invalid Expo push token for user ${resident.id}: ${token}`);
-        continue;
-      }
-      messages.push({
-        to: token,
-        sound: 'default',
-        title: '🔔 Visitor at the gate',
-        body: `${visitorRequest.visitorName} is waiting — Purpose: ${visitorRequest.purpose}`,
-        data: { visitorRequestId },
+      // 1. Re-fetch the visitor request — it may have been decided or deleted since enqueue
+      const visitorRequest = await prisma.visitorRequest.findUnique({
+        where: { id: visitorRequestId },
       });
-    }
 
-    if (messages.length === 0) {
-      console.log(`[Push Worker] No valid push tokens — skipping send`);
-      return;
-    }
-
-    // 5. Send in chunks (Expo's recommended approach for batching)
-    const chunks = expo.chunkPushNotifications(messages);
-    let sentCount = 0;
-    for (const chunk of chunks) {
-      try {
-        const tickets = await expo.sendPushNotificationsAsync(chunk);
-        sentCount += tickets.length;
-        for (const ticket of tickets) {
-          if (ticket.status === 'error') {
-            console.log(`[Push Worker][PUSH ERROR] ${ticket.message} (${ticket.details?.error})`);
-          }
-        }
-      } catch (err) {
-        console.error('[Push Worker][PUSH ERROR] Failed to send chunk:', err);
+      if (!visitorRequest) {
+        console.log(
+          `[Push Worker] visitorRequestId=${visitorRequestId} not found — skipping push notification`,
+        );
+        return;
       }
-    }
 
-    console.log(
-      `[Push Worker][PUSH SENT] ${sentCount} token(s) notified for visitorRequestId=${visitorRequestId}`,
-    );
-  },
-  {
-    connection: workerConnection, // maxRetriesPerRequest: null — required for blocking commands
-    concurrency: 1,
-  },
-);
+      // 2. Status check — this is the core of Step 3.1.
+      //    Only send a push if the resident hasn't already acted via the socket.
+      if (visitorRequest.status !== 'PENDING') {
+        console.log(
+          `[Push Worker][SKIP] visitorRequestId=${visitorRequestId} is no longer PENDING ` +
+            `(status=${visitorRequest.status}) — skipping push notification`,
+        );
+        return;
+      }
 
-// Startup confirmation — proves the Worker actually registered and is polling Redis
-console.log(
-  `[Push Worker] initialized and listening on queue "visitor-notifications" ` +
-    `(Redis: ${workerConnection.host}:${workerConnection.port}, delay: ${PUSH_NOTIFICATION_DELAY_MS}ms)`,
-);
+      // 3. Fetch all residents on this flat who have a stored push token
+      const residents = await prisma.user.findMany({
+        where: {
+          flatId,
+          role: 'RESIDENT',
+          expoPushToken: { not: null },
+        },
+        select: { id: true, name: true, expoPushToken: true },
+      });
 
-worker.on('failed', (job, err) => {
-  console.error(`[Push Worker] Job ${job?.id} failed:`, err.message);
-});
+      if (residents.length === 0) {
+        console.log(
+          `[Push Worker] No residents with push tokens found for flatId=${flatId} — skipping`,
+        );
+        return;
+      }
+
+      // 4. Build push messages (filter invalid tokens defensively)
+      const messages: ExpoPushMessage[] = [];
+      for (const resident of residents) {
+        const token = resident.expoPushToken!;
+        if (!Expo.isExpoPushToken(token)) {
+          console.log(`[Push Worker] Invalid Expo push token for user ${resident.id}: ${token}`);
+          continue;
+        }
+        messages.push({
+          to: token,
+          sound: 'default',
+          title: '🔔 Visitor at the gate',
+          body: `${visitorRequest.visitorName} is waiting — Purpose: ${visitorRequest.purpose}`,
+          data: { visitorRequestId },
+        });
+      }
+
+      if (messages.length === 0) {
+        console.log(`[Push Worker] No valid push tokens — skipping send`);
+        return;
+      }
+
+      // 5. Send in chunks (Expo's recommended approach for batching)
+      const chunks = expo.chunkPushNotifications(messages);
+      let sentCount = 0;
+      for (const chunk of chunks) {
+        try {
+          const tickets = await expo.sendPushNotificationsAsync(chunk);
+          sentCount += tickets.length;
+          for (const ticket of tickets) {
+            if (ticket.status === 'error') {
+              console.log(`[Push Worker][PUSH ERROR] ${ticket.message} (${ticket.details?.error})`);
+            }
+          }
+        } catch (err) {
+          console.error('[Push Worker][PUSH ERROR] Failed to send chunk:', err);
+        }
+      }
+
+      console.log(
+        `[Push Worker][PUSH SENT] ${sentCount} token(s) notified for visitorRequestId=${visitorRequestId}`,
+      );
+    },
+    {
+      connection: workerConnection, // maxRetriesPerRequest: null — required for blocking commands
+      concurrency: 1,
+    },
+  );
+
+  // Startup confirmation — proves the Worker actually registered and is polling Redis
+  console.log(
+    `[Push Worker] initialized and listening on queue "visitor-notifications" ` +
+      `(Redis: ${workerConnection.host}:${workerConnection.port}, delay: ${PUSH_NOTIFICATION_DELAY_MS}ms)`,
+  );
+
+  worker.on('failed', (job, err) => {
+    console.error(`[Push Worker] Job ${job?.id} failed:`, err.message);
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Graceful shutdown — called from app.ts onClose hook
 // ---------------------------------------------------------------------------
 export async function closeWorker(): Promise<void> {
-  await worker.close();
+  if (worker) {
+    await worker.close();
+  }
   await visitorNotificationQueue.close();
 }

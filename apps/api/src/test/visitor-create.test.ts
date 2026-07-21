@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 /**
  * Step 2.1 — Visitor request creation endpoint verification test
  *

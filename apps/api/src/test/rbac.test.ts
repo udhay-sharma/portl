@@ -1,3 +1,4 @@
+process.env.NODE_ENV = 'test';
 /**
  * Step 1.5 — RBAC scoping integration test
  *
