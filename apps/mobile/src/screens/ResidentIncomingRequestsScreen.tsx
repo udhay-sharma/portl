@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { getVisitorRequests, updateVisitorStatus, type VisitorRequest } from '../lib/api';
 import { connectSocket } from '../lib/socket';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
 import { StatusBadge } from '../components/ui/StatusBadge';
 
 interface ResidentIncomingRequestsScreenProps {
@@ -21,9 +22,11 @@ export function ResidentIncomingRequestsScreen({
   const [requests, setRequests] = useState<VisitorRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   const fetchRequests = useCallback(async () => {
+    setFetchError(null);
     try {
       const data = await getVisitorRequests(token);
       // Sort newest first
@@ -31,6 +34,7 @@ export function ResidentIncomingRequestsScreen({
       setRequests(data);
     } catch (err) {
       console.error('Failed to fetch visitor requests:', err);
+      setFetchError(err instanceof Error ? err.message : 'Failed to fetch visitor requests');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -119,13 +123,22 @@ export function ResidentIncomingRequestsScreen({
         </View>
 
         <Text className="text-text font-bold text-lg mb-3">Pending Approvals</Text>
-        {loading ? (
-          <Text className="text-muted text-sm italic py-4">Loading requests...</Text>
-        ) : pendingRequests.length === 0 ? (
+        {fetchError ? (
           <Card className="py-6 items-center">
-            <Text className="text-muted font-semibold">No pending visitors waiting right now.</Text>
-            <Text className="text-muted text-xs mt-1">Live alerts will appear here instantly.</Text>
+            <Text className="text-status-rejected font-bold mb-2">Network Error</Text>
+            <Text className="text-muted text-center text-sm mb-4">{fetchError}</Text>
+            <Button title="Retry" onPress={handleRefresh} roleColor="resident" />
           </Card>
+        ) : loading ? (
+          <View className="py-8 items-center">
+            <ActivityIndicator size="large" color="#C99A3C" />
+            <Text className="text-muted text-sm mt-3">Loading requests...</Text>
+          </View>
+        ) : pendingRequests.length === 0 ? (
+          <EmptyState
+            title="No pending visitors"
+            subtitle="Live alerts will appear here instantly when someone is at the gate."
+          />
         ) : (
           pendingRequests.map((req) => (
             <Card key={req.id} className="border border-resident mb-4">

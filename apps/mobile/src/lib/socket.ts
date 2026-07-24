@@ -18,7 +18,7 @@ export function connectSocket(
 
   socket.on('connect', () => {
     // Step 2.5: join flat:{flatId} room
-    socket?.emit('join', `flat:${flatId}`);
+    socket?.emit('join', flatId);
   });
 
   if (onNewVisitor) {

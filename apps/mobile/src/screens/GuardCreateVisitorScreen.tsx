@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { VisitorRequestSchema, type VisitorRequestInput } from '@portl/shared';
 import { createVisitorRequest, type VisitorRequest } from '../lib/api';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
@@ -149,7 +150,7 @@ export function GuardCreateVisitorScreen({
 
         <Text className="text-text font-bold text-lg mb-3">Recent Gate Requests (Live)</Text>
         {recentRequests.length === 0 ? (
-          <Text className="text-muted text-sm italic">No recent requests created from this gate yet.</Text>
+          <EmptyState title="No recent requests yet" subtitle="Visitor requests created from this gate will appear here." />
         ) : (
           recentRequests.map((req) => (
             <Card key={req.id} className="flex-row justify-between items-center mb-3">

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { getAmenities, bookAmenity, type Amenity } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -14,6 +14,7 @@ export function AmenitiesScreen({ token }: AmenitiesScreenProps) {
   const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Booking form state
   const [selectedAmenityId, setSelectedAmenityId] = useState<string | null>(null);
@@ -23,11 +24,13 @@ export function AmenitiesScreen({ token }: AmenitiesScreenProps) {
   const [booking, setBooking] = useState(false);
 
   const fetchAmenities = useCallback(async () => {
+    setFetchError(null);
     try {
       const data = await getAmenities(token);
       setAmenities(data);
     } catch (err) {
       console.error('Failed to fetch amenities:', err);
+      setFetchError(err instanceof Error ? err.message : 'Failed to fetch amenities');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -101,8 +104,17 @@ export function AmenitiesScreen({ token }: AmenitiesScreenProps) {
 
       <View className="p-md">
         <Text className="text-text font-bold text-lg mb-3">Available Amenities</Text>
-        {loading ? (
-          <Text className="text-muted text-sm italic py-4">Loading amenities...</Text>
+        {fetchError ? (
+          <Card className="py-6 items-center">
+            <Text className="text-status-rejected font-bold mb-2">Network Error</Text>
+            <Text className="text-muted text-center text-sm mb-4">{fetchError}</Text>
+            <Button title="Retry" onPress={handleRefresh} roleColor="resident" />
+          </Card>
+        ) : loading ? (
+          <View className="py-8 items-center">
+            <ActivityIndicator size="large" color="#C99A3C" />
+            <Text className="text-muted text-sm mt-3">Loading amenities...</Text>
+          </View>
         ) : amenities.length === 0 ? (
           <EmptyState
             title="No amenities available"

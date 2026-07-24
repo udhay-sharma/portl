@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, Alert, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { getPolls, castVote, type Poll } from '../lib/api';
 import { Card } from '../components/ui/Card';
+import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 
 interface PollsScreenProps {
@@ -12,10 +13,12 @@ export function PollsScreen({ token }: PollsScreenProps) {
   const [polls, setPolls] = useState<Poll[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [votedPolls, setVotedPolls] = useState<Set<string>>(new Set());
   const [votingPollId, setVotingPollId] = useState<string | null>(null);
 
   const fetchPolls = useCallback(async () => {
+    setFetchError(null);
     try {
       const data = await getPolls(token);
       data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -25,6 +28,7 @@ export function PollsScreen({ token }: PollsScreenProps) {
       // we track user-voted locally after casting)
     } catch (err) {
       console.error('Failed to fetch polls:', err);
+      setFetchError(err instanceof Error ? err.message : 'Failed to fetch polls');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -72,8 +76,17 @@ export function PollsScreen({ token }: PollsScreenProps) {
       </View>
 
       <View className="p-md">
-        {loading ? (
-          <Text className="text-muted text-sm italic py-4">Loading polls...</Text>
+        {fetchError ? (
+          <Card className="py-6 items-center">
+            <Text className="text-status-rejected font-bold mb-2">Network Error</Text>
+            <Text className="text-muted text-center text-sm mb-4">{fetchError}</Text>
+            <Button title="Retry" onPress={handleRefresh} roleColor="resident" />
+          </Card>
+        ) : loading ? (
+          <View className="py-8 items-center">
+            <ActivityIndicator size="large" color="#C99A3C" />
+            <Text className="text-muted text-sm mt-3">Loading polls...</Text>
+          </View>
         ) : polls.length === 0 ? (
           <EmptyState
             title="No polls yet"

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { getComplaints, createComplaint, updateComplaintStatus, type Complaint } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -21,6 +21,7 @@ export function ComplaintsScreen({ token, role }: ComplaintsScreenProps) {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   // Resident create form
@@ -29,12 +30,14 @@ export function ComplaintsScreen({ token, role }: ComplaintsScreenProps) {
   const [creating, setCreating] = useState(false);
 
   const fetchComplaints = useCallback(async () => {
+    setFetchError(null);
     try {
       const data = await getComplaints(token);
       data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setComplaints(data);
     } catch (err) {
       console.error('Failed to fetch complaints:', err);
+      setFetchError(err instanceof Error ? err.message : 'Failed to fetch complaints');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -132,8 +135,17 @@ export function ComplaintsScreen({ token, role }: ComplaintsScreenProps) {
         <Text className="text-text font-bold text-lg mb-3">
           {role === 'ADMIN' ? 'All Complaints' : 'Your Complaints'}
         </Text>
-        {loading ? (
-          <Text className="text-muted text-sm italic py-4">Loading complaints...</Text>
+        {fetchError ? (
+          <Card className="py-6 items-center">
+            <Text className="text-status-rejected font-bold mb-2">Network Error</Text>
+            <Text className="text-muted text-center text-sm mb-4">{fetchError}</Text>
+            <Button title="Retry" onPress={handleRefresh} roleColor={roleColor} />
+          </Card>
+        ) : loading ? (
+          <View className="py-8 items-center">
+            <ActivityIndicator size="large" color={role === 'ADMIN' ? '#4F46E5' : '#C99A3C'} />
+            <Text className="text-muted text-sm mt-3">Loading complaints...</Text>
+          </View>
         ) : complaints.length === 0 ? (
           <EmptyState
             title="No complaints yet"

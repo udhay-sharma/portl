@@ -96,7 +96,7 @@ export default function App() {
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      className="bg-surface border-b border-border"
+      className="bg-surface border-b border-border grow-0 shrink-0"
       contentContainerStyle={{ paddingHorizontal: 12 }}
     >
       {tabs.map((tab) => (

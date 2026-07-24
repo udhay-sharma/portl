@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, Alert } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { getNotices, createNotice, type Notice } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -15,6 +15,7 @@ export function NoticesScreen({ token, role }: NoticesScreenProps) {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   // Admin create form
   const [title, setTitle] = useState('');
@@ -22,12 +23,14 @@ export function NoticesScreen({ token, role }: NoticesScreenProps) {
   const [creating, setCreating] = useState(false);
 
   const fetchNotices = useCallback(async () => {
+    setFetchError(null);
     try {
       const data = await getNotices(token);
       data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setNotices(data);
     } catch (err) {
       console.error('Failed to fetch notices:', err);
+      setFetchError(err instanceof Error ? err.message : 'Failed to fetch notices');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -109,8 +112,17 @@ export function NoticesScreen({ token, role }: NoticesScreenProps) {
         )}
 
         <Text className="text-text font-bold text-lg mb-3">All Notices</Text>
-        {loading ? (
-          <Text className="text-muted text-sm italic py-4">Loading notices...</Text>
+        {fetchError ? (
+          <Card className="py-6 items-center">
+            <Text className="text-status-rejected font-bold mb-2">Network Error</Text>
+            <Text className="text-muted text-center text-sm mb-4">{fetchError}</Text>
+            <Button title="Retry" onPress={handleRefresh} roleColor={roleColor} />
+          </Card>
+        ) : loading ? (
+          <View className="py-8 items-center">
+            <ActivityIndicator size="large" color={role === 'ADMIN' ? '#4F46E5' : '#C99A3C'} />
+            <Text className="text-muted text-sm mt-3">Loading notices...</Text>
+          </View>
         ) : notices.length === 0 ? (
           <EmptyState
             title="No notices yet"
