@@ -1,4 +1,5 @@
 import './global.css';
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView, View, Text, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
@@ -237,7 +238,6 @@ function AppContent() {
     </SafeAreaView>
   );
 }
-
 export default function App() {
   return (
     <AuthProvider>
@@ -245,3 +245,4 @@ export default function App() {
     </AuthProvider>
   );
 }
+
