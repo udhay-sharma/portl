@@ -47,6 +47,17 @@ export interface LoginResponse {
   user: UserProfile;
 }
 
+export async function getMe(token: string): Promise<{ id: string; role: string; societyId: string }> {
+  const res = await fetch(`${API_BASE_URL}/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    throw new Error('Failed to fetch profile');
+  }
+  const result = await res.json();
+  return result.user;
+}
+
 export interface VisitorRequest {
   id: string;
   name: string;
@@ -320,7 +331,14 @@ export interface Amenity {
   name: string;
   description: string | null;
   societyId: string;
+  slotDurationMinutes: number;
   createdAt: string;
+  bookings?: {
+    id: string;
+    bookedByUserId: string;
+    startTime: string;
+    endTime: string;
+  }[];
 }
 
 export interface AmenityBooking {

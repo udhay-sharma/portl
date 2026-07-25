@@ -162,6 +162,43 @@ async function main() {
   });
   console.log(`  ✅ User [ADMIN]:    ${adminUser.email} (flatId: ${adminUser.flatId}, gateId: ${adminUser.gateId})`);
 
+  // 7. Amenities
+  const clubhouse = await prisma.amenity.upsert({
+    where: { id: 'e0000000-0000-0000-0000-000000000001' },
+    update: {
+      name: 'Clubhouse',
+      description: 'Main society clubhouse',
+      slotDurationMinutes: 60,
+      societyId: SOCIETY_ID,
+    },
+    create: {
+      id: 'e0000000-0000-0000-0000-000000000001',
+      name: 'Clubhouse',
+      description: 'Main society clubhouse',
+      slotDurationMinutes: 60,
+      societyId: SOCIETY_ID,
+    },
+  });
+  console.log(`  ✅ Amenity: ${clubhouse.name} (${clubhouse.slotDurationMinutes} mins)`);
+
+  const tennisCourt = await prisma.amenity.upsert({
+    where: { id: 'e0000000-0000-0000-0000-000000000002' },
+    update: {
+      name: 'Tennis Court',
+      description: 'Outdoor tennis court',
+      slotDurationMinutes: 30,
+      societyId: SOCIETY_ID,
+    },
+    create: {
+      id: 'e0000000-0000-0000-0000-000000000002',
+      name: 'Tennis Court',
+      description: 'Outdoor tennis court',
+      slotDurationMinutes: 30,
+      societyId: SOCIETY_ID,
+    },
+  });
+  console.log(`  ✅ Amenity: ${tennisCourt.name} (${tennisCourt.slotDurationMinutes} mins)`);
+
   console.log('\n✨ Database seeding completed successfully.');
   console.log(`🔑 All seeded users can log in with password: "${KNOWN_PASSWORD}"`);
 }

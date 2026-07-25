@@ -14,9 +14,23 @@ const amenityRoutes: FastifyPluginAsync = async (fastify) => {
     { preHandler: [requireAuth] },
     async (request, reply) => {
       const { societyId } = request.user;
+      const startOfTodayUTC = new Date();
+      startOfTodayUTC.setUTCHours(0, 0, 0, 0);
+
       const amenities = await prisma.amenity.findMany({
         where: { societyId },
         orderBy: { createdAt: 'desc' },
+        include: {
+          bookings: {
+            where: { date: { gte: startOfTodayUTC } },
+            select: {
+              id: true,
+              bookedByUserId: true,
+              startTime: true,
+              endTime: true,
+            },
+          },
+        },
       });
       return reply.status(200).send({ amenities });
     }

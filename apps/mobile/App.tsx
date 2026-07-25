@@ -14,7 +14,7 @@ const SEEDED_FLAT_ID = 'c0000000-0000-0000-0000-000000000001'; // Flat 101
 
 type ActiveRole = 'guard' | 'resident' | 'admin';
 type ResidentTab = 'visitors' | 'notices' | 'polls' | 'complaints' | 'amenities';
-type AdminTab = 'notices' | 'complaints';
+type AdminTab = 'notices' | 'complaints' | 'amenities';
 
 export default function App() {
   const [activeRole, setActiveRole] = useState<ActiveRole>('guard');
@@ -130,6 +130,7 @@ export default function App() {
   const adminTabs = [
     { key: 'notices', label: 'Notices' },
     { key: 'complaints', label: 'Complaints' },
+    { key: 'amenities', label: 'Amenities' },
   ];
 
   const renderResidentContent = () => {
@@ -163,6 +164,8 @@ export default function App() {
         return <NoticesScreen token={adminToken} role="ADMIN" />;
       case 'complaints':
         return <ComplaintsScreen token={adminToken} role="ADMIN" />;
+      case 'amenities':
+        return <AmenitiesScreen token={adminToken} />;
       default:
         return null;
     }

@@ -235,9 +235,10 @@ model Amenity {
   id          String   @id @default(dbgenerated("gen_random_uuid()"))
   name        String
   description String?
-  societyId   String
-  version     Int      @default(0) // optimistic lock field
-  createdAt   DateTime @default(now())
+  societyId           String
+  slotDurationMinutes Int      @default(60)
+  version             Int      @default(0) // optimistic lock field
+  createdAt           DateTime @default(now())
 
   society  Society          @relation(fields: [societyId], references: [id])
   bookings AmenityBooking[]

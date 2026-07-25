@@ -1,9 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
-import { getAmenities, bookAmenity, type Amenity } from '../lib/api';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { getAmenities, bookAmenity, getMe, type Amenity } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { Input } from '../components/ui/Input';
 import { EmptyState } from '../components/ui/EmptyState';
 
 interface AmenitiesScreenProps {
@@ -12,24 +11,29 @@ interface AmenitiesScreenProps {
 
 export function AmenitiesScreen({ token }: AmenitiesScreenProps) {
   const [amenities, setAmenities] = useState<Amenity[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Booking form state
+  // Booking state
   const [selectedAmenityId, setSelectedAmenityId] = useState<string | null>(null);
-  const [bookingDate, setBookingDate] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
   const [booking, setBooking] = useState(false);
+  
+  // Hardcode today for hackathon, usually would have a date picker
+  const todayStr = new Date().toISOString().split('T')[0];
 
-  const fetchAmenities = useCallback(async () => {
+  const fetchData = useCallback(async () => {
     setFetchError(null);
     try {
-      const data = await getAmenities(token);
+      const [me, data] = await Promise.all([
+        getMe(token),
+        getAmenities(token)
+      ]);
+      setCurrentUserId(me.id);
       setAmenities(data);
     } catch (err) {
-      console.error('Failed to fetch amenities:', err);
+      console.error('Failed to fetch data:', err);
       setFetchError(err instanceof Error ? err.message : 'Failed to fetch amenities');
     } finally {
       setLoading(false);
@@ -38,56 +42,71 @@ export function AmenitiesScreen({ token }: AmenitiesScreenProps) {
   }, [token]);
 
   useEffect(() => {
-    fetchAmenities();
-  }, [fetchAmenities]);
+    fetchData();
+  }, [fetchData]);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    fetchAmenities();
+    fetchData();
   };
 
-  const handleBook = async () => {
-    if (!selectedAmenityId || !bookingDate || !startTime || !endTime) {
-      Alert.alert('Validation', 'Please fill in all booking fields.');
-      return;
-    }
-
-    // Helper to normalize "9.45" or "9:45" into "09:45"
-    const normalizeTime = (t: string) => {
-      let cleaned = t.replace('.', ':');
-      if (cleaned.length === 4 && cleaned.includes(':')) {
-        cleaned = `0${cleaned}`; // e.g. "9:45" -> "09:45"
-      }
-      return cleaned;
-    };
-
-    // Build ISO datetime strings from user input
-    const dateStr = bookingDate; // expects YYYY-MM-DD
-    const startISO = `${dateStr}T${normalizeTime(startTime)}:00.000Z`;
-    const endISO = `${dateStr}T${normalizeTime(endTime)}:00.000Z`;
-
-    if (new Date(endISO) <= new Date(startISO)) {
-      Alert.alert('Validation', 'End time must be after start time.');
-      return;
-    }
-
+  const handleBookSlot = async (amenityId: string, startISO: string, endISO: string) => {
     setBooking(true);
     try {
-      await bookAmenity(token, selectedAmenityId, {
-        date: `${dateStr}T00:00:00.000Z`,
+      await bookAmenity(token, amenityId, {
+        date: `${todayStr}T00:00:00.000Z`,
         startTime: startISO,
         endTime: endISO,
       });
       Alert.alert('Success', 'Amenity booked successfully!');
-      setSelectedAmenityId(null);
-      setBookingDate('');
-      setStartTime('');
-      setEndTime('');
+      // Refresh to get the new booking status
+      fetchData();
     } catch (err) {
       Alert.alert('Booking Failed', err instanceof Error ? err.message : 'Failed to book amenity');
     } finally {
       setBooking(false);
     }
+  };
+
+  // Helper to generate slots
+  const getSlotsForAmenity = (durationMins: number) => {
+    const slots = [];
+    const startHour = 8; // 8 AM local
+    const endHour = 22; // 10 PM local
+    
+    let current = new Date();
+    current.setHours(startHour, 0, 0, 0);
+    const end = new Date();
+    end.setHours(endHour, 0, 0, 0);
+    
+    while (current < end) {
+      const slotStart = new Date(current);
+      const slotEnd = new Date(current.getTime() + durationMins * 60000);
+      
+      if (slotEnd > end) break;
+      
+      slots.push({ start: slotStart, end: slotEnd });
+      current = slotEnd;
+    }
+    return slots;
+  };
+
+  const getSlotState = (slotStart: Date, slotEnd: Date, bookings: Amenity['bookings']) => {
+    if (!bookings || !currentUserId) return 'available';
+    
+    const overlappingBooking = bookings.find((b) => {
+      const bStart = new Date(b.startTime);
+      const bEnd = new Date(b.endTime);
+      return slotStart < bEnd && slotEnd > bStart;
+    });
+
+    if (!overlappingBooking) return 'available';
+    if (overlappingBooking.bookedByUserId === currentUserId) return 'booked-by-me';
+    return 'booked-by-someone-else';
+  };
+
+  const formatTime = (d: Date) => {
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
   };
 
   return (
@@ -103,7 +122,7 @@ export function AmenitiesScreen({ token }: AmenitiesScreenProps) {
       </View>
 
       <View className="p-md">
-        <Text className="text-text font-bold text-lg mb-3">Available Amenities</Text>
+        <Text className="text-text font-bold text-lg mb-3">Available Amenities (Today)</Text>
         {fetchError ? (
           <Card className="py-6 items-center">
             <Text className="text-status-rejected font-bold mb-2">Network Error</Text>
@@ -123,6 +142,7 @@ export function AmenitiesScreen({ token }: AmenitiesScreenProps) {
         ) : (
           amenities.map((amenity) => {
             const isSelected = selectedAmenityId === amenity.id;
+            const slots = getSlotsForAmenity(amenity.slotDurationMinutes || 60);
 
             return (
               <Card key={amenity.id} className={`mb-3 ${isSelected ? 'border-resident' : ''}`}>
@@ -134,7 +154,7 @@ export function AmenitiesScreen({ token }: AmenitiesScreenProps) {
                     )}
                   </View>
                   <Button
-                    title={isSelected ? 'Cancel' : 'Book'}
+                    title={isSelected ? 'Close' : 'View Slots'}
                     variant={isSelected ? 'secondary' : 'primary'}
                     roleColor="resident"
                     onPress={() => setSelectedAmenityId(isSelected ? null : amenity.id)}
@@ -144,31 +164,40 @@ export function AmenitiesScreen({ token }: AmenitiesScreenProps) {
 
                 {isSelected && (
                   <View className="mt-3 pt-3 border-t border-border">
-                    <Text className="text-text font-semibold text-sm mb-2">Book this amenity</Text>
-                    <Input
-                      label="Date (YYYY-MM-DD)"
-                      placeholder="e.g. 2026-10-01"
-                      value={bookingDate}
-                      onChangeText={setBookingDate}
-                    />
-                    <Input
-                      label="Start Time (HH:MM, 24h UTC)"
-                      placeholder="e.g. 09:00"
-                      value={startTime}
-                      onChangeText={setStartTime}
-                    />
-                    <Input
-                      label="End Time (HH:MM, 24h UTC)"
-                      placeholder="e.g. 10:00"
-                      value={endTime}
-                      onChangeText={setEndTime}
-                    />
-                    <Button
-                      title="Confirm Booking"
-                      roleColor="resident"
-                      onPress={handleBook}
-                      loading={booking}
-                    />
+                    <Text className="text-text font-semibold text-sm mb-3">Select a slot for {todayStr}</Text>
+                    
+                    <View className="flex-row flex-wrap">
+                      {slots.map((slot, index) => {
+                        const state = getSlotState(slot.start, slot.end, amenity.bookings);
+                        const label = `${formatTime(slot.start)}`;
+                        
+                        let bgClass = "bg-white border border-border";
+                        let textClass = "text-text";
+                        let disabled = false;
+                        
+                        if (state === 'booked-by-me') {
+                          bgClass = "bg-resident border-resident";
+                          textClass = "text-white font-bold";
+                          disabled = true;
+                        } else if (state === 'booked-by-someone-else') {
+                          bgClass = "bg-gray-200 border-gray-300 opacity-60";
+                          textClass = "text-muted";
+                          disabled = true;
+                        }
+
+                        return (
+                          <TouchableOpacity
+                            key={index}
+                            disabled={disabled || booking}
+                            onPress={() => handleBookSlot(amenity.id, slot.start.toISOString(), slot.end.toISOString())}
+                            className={`mr-2 mb-2 px-3 py-2 rounded-lg ${bgClass} ${booking ? 'opacity-50' : ''}`}
+                          >
+                            <Text className={`text-xs ${textClass}`}>{label}</Text>
+                            {state === 'booked-by-me' && <Text className="text-white text-[10px] mt-0.5 font-bold">Booked</Text>}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
                   </View>
                 )}
               </Card>
