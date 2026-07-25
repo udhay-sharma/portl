@@ -9,6 +9,7 @@ import { NoticesScreen } from './src/screens/NoticesScreen';
 import { PollsScreen } from './src/screens/PollsScreen';
 import { ComplaintsScreen } from './src/screens/ComplaintsScreen';
 import { AmenitiesScreen } from './src/screens/AmenitiesScreen';
+import { AuthProvider, useAuth } from './src/lib/auth';
 
 const SEEDED_FLAT_ID = 'c0000000-0000-0000-0000-000000000001'; // Flat 101
 
@@ -16,7 +17,7 @@ type ActiveRole = 'guard' | 'resident' | 'admin';
 type ResidentTab = 'visitors' | 'notices' | 'polls' | 'complaints' | 'amenities';
 type AdminTab = 'notices' | 'complaints' | 'amenities';
 
-export default function App() {
+function AppContent() {
   const [activeRole, setActiveRole] = useState<ActiveRole>('guard');
   const [guardToken, setGuardToken] = useState<string | null>(null);
   const [guardUser, setGuardUser] = useState<UserProfile | null>(null);
@@ -27,6 +28,12 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [recentGuardRequests, setRecentGuardRequests] = useState<VisitorRequest[]>([]);
+
+  // To prove AuthContext is working underneath, we log it
+  const { token, user, isLoading } = useAuth();
+  useEffect(() => {
+    console.log('[AuthContext State Check]', { token, user, isLoading });
+  }, [token, user, isLoading]);
 
   // Tab state per role
   const [residentTab, setResidentTab] = useState<ResidentTab>('visitors');
@@ -228,5 +235,13 @@ export default function App() {
         ) : null}
       </View>
     </SafeAreaView>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

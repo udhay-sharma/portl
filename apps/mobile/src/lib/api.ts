@@ -2,6 +2,16 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import type { VisitorRequestInput, UpdateVisitorStatusInput } from '@portl/shared';
 
+export let onUnauthorized: (() => void) | null = null;
+export function setOnUnauthorized(cb: () => void) {
+  onUnauthorized = cb;
+}
+
+function check401(res: Response) {
+  if (res.status === 401) {
+    onUnauthorized?.();
+  }
+}
 function getApiBaseUrl(): string {
   // 0. Production override — set this for EAS/APK builds, takes priority over everything below
   if (process.env.EXPO_PUBLIC_API_URL) {
@@ -52,6 +62,7 @@ export async function getMe(token: string): Promise<{ id: string; role: string; 
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
+    check401(res);
     throw new Error('Failed to fetch profile');
   }
   const result = await res.json();
@@ -78,6 +89,7 @@ export async function login(credential: string, password = 'password123'): Promi
     body: JSON.stringify({ credential, password }),
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Login failed' }));
     throw new Error(err.error || err.message || 'Failed to login');
   }
@@ -108,6 +120,7 @@ export async function createVisitorRequest(
     body: JSON.stringify(data),
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Creation failed' }));
     throw new Error(err.error || err.message || 'Failed to create visitor request');
   }
@@ -123,6 +136,7 @@ export async function getVisitorRequests(token: string): Promise<VisitorRequest[
     },
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Fetch failed' }));
     throw new Error(err.error || err.message || 'Failed to fetch visitor requests');
   }
@@ -149,6 +163,7 @@ export async function updateVisitorStatus(
     body: JSON.stringify(payload),
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Update failed' }));
     throw new Error(err.error || err.message || 'Failed to update visitor status');
   }
@@ -175,6 +190,7 @@ export async function getNotices(token: string): Promise<Notice[]> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Fetch failed' }));
     throw new Error(err.error || err.message || 'Failed to fetch notices');
   }
@@ -195,6 +211,7 @@ export async function createNotice(
     body: JSON.stringify(data),
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Creation failed' }));
     throw new Error(err.error || err.message || 'Failed to create notice');
   }
@@ -225,6 +242,7 @@ export async function getPolls(token: string): Promise<Poll[]> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Fetch failed' }));
     throw new Error(err.error || err.message || 'Failed to fetch polls');
   }
@@ -246,6 +264,7 @@ export async function castVote(
     body: JSON.stringify({ selectedOption }),
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Vote failed' }));
     throw new Error(err.error || err.message || 'Failed to cast vote');
   }
@@ -274,6 +293,7 @@ export async function getComplaints(token: string): Promise<Complaint[]> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Fetch failed' }));
     throw new Error(err.error || err.message || 'Failed to fetch complaints');
   }
@@ -294,6 +314,7 @@ export async function createComplaint(
     body: JSON.stringify(data),
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Creation failed' }));
     throw new Error(err.error || err.message || 'Failed to create complaint');
   }
@@ -315,6 +336,7 @@ export async function updateComplaintStatus(
     body: JSON.stringify({ status }),
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Update failed' }));
     throw new Error(err.error || err.message || 'Failed to update complaint status');
   }
@@ -355,6 +377,7 @@ export async function getAmenities(token: string): Promise<Amenity[]> {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ error: 'Fetch failed' }));
     throw new Error(err.error || err.message || 'Failed to fetch amenities');
   }
@@ -376,6 +399,7 @@ export async function bookAmenity(
     body: JSON.stringify(data),
   });
   if (!res.ok) {
+    check401(res);
     const err = await res.json().catch(() => ({ message: 'Booking failed' }));
     throw new Error(err.message || err.error || 'Failed to book amenity');
   }
