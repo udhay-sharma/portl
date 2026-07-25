@@ -275,6 +275,30 @@ export async function updateVisitorStatus(
 }
 
 // ---------------------------------------------------------------------------
+// Flats & Residents
+// ---------------------------------------------------------------------------
+
+export interface FlatSearchResult {
+  id: string;
+  number: string;
+  tower: { name: string };
+  residents: { name: string; phone: string | null }[];
+}
+
+export async function searchFlats(token: string, q: string): Promise<FlatSearchResult[]> {
+  const res = await fetch(`${API_BASE_URL}/flats/search?q=${encodeURIComponent(q)}`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    check401(res);
+    throw new Error('Failed to search flats');
+  }
+  const result = await res.json();
+  return result.flats;
+}
+
+// ---------------------------------------------------------------------------
 // Notices
 // ---------------------------------------------------------------------------
 

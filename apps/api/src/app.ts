@@ -8,6 +8,7 @@ import pollRoutes from './routes/polls.js';
 import complaintRoutes from './routes/complaints.js';
 import amenityRoutes from './routes/amenities.js';
 import staffRoutes from './routes/staff.js';
+import flatRoutes from './routes/flats.js';
 import socketPlugin from './plugins/socket.js';
 import redis from './lib/redis.js';
 import { closeWorker, initPushWorker } from './workers/visitor-notification.worker.js';
@@ -44,6 +45,7 @@ export async function createApp(): Promise<FastifyInstance> {
   await fastify.register(complaintRoutes);
   await fastify.register(amenityRoutes);
   await fastify.register(staffRoutes);
+  await fastify.register(flatRoutes);
 
 
   // Health check — same contract as Step 1.1: GET /health → { status: "ok" }

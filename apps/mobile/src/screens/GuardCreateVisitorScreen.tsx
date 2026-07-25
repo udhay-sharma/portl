@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { VisitorRequestSchema, type VisitorRequestInput } from '@portl/shared';
-import { createVisitorRequest, type VisitorRequest } from '../lib/api';
+import { createVisitorRequest, getVisitorRequests, updateVisitorStatus, searchFlats, type VisitorRequest, type FlatSearchResult } from '../lib/api';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
@@ -15,14 +15,74 @@ const SEEDED_FLAT_ID = 'c0000000-0000-0000-0000-000000000001'; // Flat 101 from 
 export function GuardCreateVisitorScreen() {
   const { token: authToken } = useAuth();
   const token = authToken as string;
-  const [recentRequests, setRecentRequests] = useState<VisitorRequest[]>([]);
+  const [visitorRequests, setVisitorRequests] = useState<VisitorRequest[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
   const [name, setName] = useState('');
   const [purpose, setPurpose] = useState('');
   const [visitorType, setVisitorType] = useState('Delivery');
-  const [flatId, setFlatId] = useState(SEEDED_FLAT_ID);
+  const [flatId, setFlatId] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<FlatSearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedFlat, setSelectedFlat] = useState<FlatSearchResult | null>(null);
+
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const results = await searchFlats(token, searchQuery);
+        setSearchResults(results);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, token]);
+
+  const fetchHistory = async () => {
+    try {
+      const data = await getVisitorRequests(token);
+      setVisitorRequests(data);
+    } catch (err) {
+      console.error('Failed to load history:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchHistory();
+  }, [token]);
+
+  const handleCheckIn = async (id: string) => {
+    try {
+      const updated = await updateVisitorStatus(token, id, 'CHECKED_IN');
+      setVisitorRequests((prev) => prev.map((req) => req.id === id ? updated : req));
+      Alert.alert('Success', 'Visitor checked in successfully');
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to check in');
+    }
+  };
+
+  const handleCheckOut = async (id: string) => {
+    try {
+      const updated = await updateVisitorStatus(token, id, 'CHECKED_OUT');
+      setVisitorRequests((prev) => prev.map((req) => req.id === id ? updated : req));
+      Alert.alert('Success', 'Visitor checked out successfully');
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to check out');
+    }
+  };
 
   const handleSubmit = async () => {
     setErrors({});
@@ -52,10 +112,12 @@ export function GuardCreateVisitorScreen() {
     setLoading(true);
     try {
       const created = await createVisitorRequest(token, parsed.data);
-      setRecentRequests((prev) => [created, ...prev]);
+      setVisitorRequests((prev) => [created, ...prev]);
       setName('');
       setPurpose('');
       setPhotoUrl('');
+      setSelectedFlat(null);
+      setFlatId('');
       Alert.alert('Success', `Visitor ${created.name} registered and sent to flat for approval!`);
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create visitor request');
@@ -118,13 +180,65 @@ export function GuardCreateVisitorScreen() {
             <Text className="text-status-rejected text-xs mb-3">{errors.visitorType}</Text>
           )}
 
-          <Input
-            label="Target Flat ID *"
-            placeholder="Flat UUID"
-            value={flatId}
-            onChangeText={setFlatId}
-            error={errors.flatId}
-          />
+          <Text className="text-text font-semibold mb-2 text-sm">Target Flat / Resident *</Text>
+          {selectedFlat ? (
+            <View className="bg-surface border border-border p-3 rounded-lg mb-4 flex-row justify-between items-center">
+              <View>
+                <Text className="text-text font-bold">
+                  {selectedFlat.tower.name} - {selectedFlat.number}
+                </Text>
+                {selectedFlat.residents.length > 0 && (
+                  <Text className="text-muted text-xs mt-1">
+                    {selectedFlat.residents.map(r => r.name).join(', ')}
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity onPress={() => {
+                setSelectedFlat(null);
+                setFlatId('');
+              }}>
+                <Text className="text-status-rejected font-bold text-xs px-2 py-1">Clear</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View className="mb-4 relative">
+              <Input
+                placeholder="Search flat (e.g. 101) or resident name..."
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                error={errors.flatId}
+              />
+              {isSearching && <ActivityIndicator size="small" className="absolute right-3 top-3" />}
+              
+              {searchResults.length > 0 && (
+                <View className="bg-surface border border-border rounded-lg mt-1 max-h-40 overflow-hidden z-10">
+                  <ScrollView nestedScrollEnabled>
+                    {searchResults.map(flat => (
+                      <TouchableOpacity
+                        key={flat.id}
+                        className="p-3 border-b border-border"
+                        onPress={() => {
+                          setSelectedFlat(flat);
+                          setFlatId(flat.id);
+                          setSearchQuery('');
+                          setSearchResults([]);
+                        }}
+                      >
+                        <Text className="text-text font-bold">
+                          {flat.tower.name} - {flat.number}
+                        </Text>
+                        {flat.residents.length > 0 && (
+                          <Text className="text-muted text-xs">
+                            {flat.residents.map(r => r.name).join(', ')}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
+          )}
 
           <Input
             label="Photo URL (Optional)"
@@ -142,22 +256,51 @@ export function GuardCreateVisitorScreen() {
           />
         </Card>
 
-        <Text className="text-text font-bold text-lg mb-3">Recent Gate Requests (Live)</Text>
-        {recentRequests.length === 0 ? (
-          <EmptyState title="No recent requests yet" subtitle="Visitor requests created from this gate will appear here." />
+        <Text className="text-text font-bold text-lg mb-3">Visitor History</Text>
+        {loadingHistory ? (
+          <View className="py-8 items-center">
+            <ActivityIndicator size="large" color="#3b82f6" />
+            <Text className="text-muted text-sm mt-3">Loading history...</Text>
+          </View>
+        ) : visitorRequests.length === 0 ? (
+          <EmptyState title="No recent requests yet" subtitle="Visitor requests from your society will appear here." />
         ) : (
-          recentRequests.map((req) => (
-            <Card key={req.id} className="flex-row justify-between items-center mb-3">
-              <View className="flex-1 mr-2">
-                <Text className="text-text font-bold text-base">{req.name}</Text>
-                <Text className="text-muted text-xs mt-0.5">
-                  {req.visitorType} • {req.purpose}
-                </Text>
-                <Text className="text-muted text-[10px] mt-1">
-                  Flat ID: {req.flatId.slice(0, 8)}...
-                </Text>
+          visitorRequests.map((req) => (
+            <Card key={req.id} className="mb-3">
+              <View className="flex-row justify-between items-start mb-2">
+                <View className="flex-1 mr-2">
+                  <Text className="text-text font-bold text-base">{req.name}</Text>
+                  <Text className="text-muted text-xs mt-0.5">
+                    {req.visitorType} • {req.purpose}
+                  </Text>
+                  <Text className="text-muted text-[10px] mt-1">
+                    Flat ID: {req.flatId.slice(0, 8)}...
+                  </Text>
+                </View>
+                <StatusBadge status={req.status} />
               </View>
-              <StatusBadge status={req.status} />
+              {req.status === 'APPROVED' && (
+                <View className="mt-2 pt-3 border-t border-border flex-row justify-end">
+                  <Button
+                    title="Check In"
+                    onPress={() => handleCheckIn(req.id)}
+                    variant="primary"
+                    roleColor="guard"
+                    className="px-6 py-2"
+                  />
+                </View>
+              )}
+              {req.status === 'CHECKED_IN' && (
+                <View className="mt-2 pt-3 border-t border-border flex-row justify-end">
+                  <Button
+                    title="Check Out"
+                    onPress={() => handleCheckOut(req.id)}
+                    variant="primary"
+                    roleColor="guard"
+                    className="px-6 py-2"
+                  />
+                </View>
+              )}
             </Card>
           ))
         )}

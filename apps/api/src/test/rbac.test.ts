@@ -20,6 +20,7 @@ import { execSync } from 'node:child_process';
 import type { FastifyInstance } from 'fastify';
 import { createApp } from '../app.js';
 import prisma from '../lib/prisma.js';
+import bcrypt from 'bcryptjs';
 
 // ---------------------------------------------------------------------------
 // Test state
@@ -100,7 +101,7 @@ before(async () => {
   assert.equal(loginA.statusCode, 200, `Login A failed: ${loginA.body}`);
   tokenA = (JSON.parse(loginA.body) as { accessToken: string }).accessToken;
 
-  // 7. Login as Guard → get token
+  // 7. Login as the seeded Guard (from the default society, for testing cross-society restrictions)
   const loginGuard = await app.inject({
     method: 'POST',
     url: '/auth/login',
@@ -108,6 +109,17 @@ before(async () => {
   });
   assert.equal(loginGuard.statusCode, 200, `Login Guard failed: ${loginGuard.body}`);
   guardToken = (JSON.parse(loginGuard.body) as { accessToken: string }).accessToken;
+
+  // 8. Create a guard in the RBAC Test Society via Prisma (since /auth/register only supports residents)
+  const otherGuard = await prisma.user.create({
+    data: {
+      name: 'RBAC Guard',
+      email: 'rbac.guard@test.portl',
+      passwordHash: await bcrypt.hash('password123', 10),
+      role: 'GUARD',
+      societyId,
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -129,7 +141,7 @@ after(async () => {
   });
   // Users first (FK to Society; Society → restrict by default)
   await prisma.user.deleteMany({
-    where: { email: { in: ['rbac.resident.a@test.portl', 'rbac.resident.b@test.portl'] } },
+    where: { email: { in: ['rbac.resident.a@test.portl', 'rbac.resident.b@test.portl', 'rbac.guard@test.portl'] } },
   });
   // Flats → Tower → Society (cascade, but delete society which cascades tower → flat)
   await prisma.flat.deleteMany({ where: { id: { in: [flatIdA, flatIdB] } } });
@@ -278,4 +290,29 @@ test('Step 2.3 Lock 3 — Resident A\'s GET /visitor-requests never includes Fla
   for (const vr of body.visitorRequests) {
     assert.equal(vr.flatId, flatIdA, `Every request must belong to Flat A (${flatIdA})`);
   }
+});
+
+test('Lock 3 — GUARD GET /visitor-requests fetches requests for their society (both Flat A and B)', async () => {
+  // Login as the RBAC Test Society guard
+  const loginGuard = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { credential: 'rbac.guard@test.portl', password: 'password123' },
+  });
+  const rbacGuardToken = (JSON.parse(loginGuard.body) as { accessToken: string }).accessToken;
+
+  const getRes = await app.inject({
+    method: 'GET',
+    url: '/visitor-requests',
+    headers: { authorization: `Bearer ${rbacGuardToken}` },
+  });
+
+  assert.equal(getRes.statusCode, 200, `Expected 200 OK for Guard, got ${getRes.statusCode}: ${getRes.body}`);
+  const body = JSON.parse(getRes.body) as { visitorRequests: Array<{ id: string; flatId: string }> };
+
+  // Should see the requests created in previous tests (Flat A and Flat B)
+  assert.ok(body.visitorRequests.length >= 2, 'Guard should see requests from both flats in their society');
+  const flatIds = new Set(body.visitorRequests.map(vr => vr.flatId));
+  assert.ok(flatIds.has(flatIdA), 'Should contain Flat A requests');
+  assert.ok(flatIds.has(flatIdB), 'Should contain Flat B requests');
 });

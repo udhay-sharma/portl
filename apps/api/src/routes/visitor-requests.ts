@@ -21,25 +21,26 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
   // -------------------------------------------------------------------------
   fastify.get(
     '/visitor-requests',
-    { preHandler: [requireAuth, requireRole('RESIDENT')] },
+    { preHandler: [requireAuth, requireRole('RESIDENT', 'GUARD')] },
     async (request, reply) => {
-      // SECURITY: flatId is read from the verified JWT payload set by requireAuth.
-      // It is structurally impossible for the query string to influence this value.
-      const scopedFlatId = request.user.flatId;
+      let whereClause: any = {};
 
-      if (!scopedFlatId) {
-        // RESIDENT must always have a flatId — this means the token was issued
-        // without one, which shouldn't happen but is a defence-in-depth check.
-        return reply.status(400).send({
-          error: 'User account has no flatId — cannot scope visitor requests',
-        });
+      if (request.user.role === 'RESIDENT') {
+        const scopedFlatId = request.user.flatId;
+        if (!scopedFlatId) {
+          return reply.status(400).send({
+            error: 'User account has no flatId — cannot scope visitor requests',
+          });
+        }
+        whereClause = { flatId: scopedFlatId };
+      } else if (request.user.role === 'GUARD') {
+        whereClause = { flat: { tower: { societyId: request.user.societyId } } };
       }
 
       const visitorRequests = await prisma.visitorRequest.findMany({
-        where: {
-          flatId: scopedFlatId, // ← verified JWT, never client-supplied
-        },
+        where: whereClause,
         orderBy: { createdAt: 'desc' },
+        take: 50, // Limit to most recent 50
       });
 
       return reply.status(200).send({ visitorRequests });
@@ -205,6 +206,7 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
 
       const visitorRequest = await prisma.visitorRequest.findUnique({
         where: { id },
+        include: { flat: { select: { tower: { select: { societyId: true } } } } },
       });
 
       if (!visitorRequest) {
@@ -220,6 +222,18 @@ const visitorRequestRoutes: FastifyPluginAsync = async (fastify) => {
         return reply.status(403).send({
           error:
             'Forbidden: you do not have permission to modify visitor requests for this flat',
+        });
+      }
+
+      // Guard row-level scoping check
+      // Guards can only modify visitor requests for flats within their assigned society.
+      if (
+        request.user.role === 'GUARD' &&
+        visitorRequest.flat.tower.societyId !== request.user.societyId
+      ) {
+        return reply.status(403).send({
+          error:
+            'Forbidden: you do not have permission to modify visitor requests for this society',
         });
       }
 

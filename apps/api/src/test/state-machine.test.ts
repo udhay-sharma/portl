@@ -17,6 +17,7 @@ import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import type { FastifyInstance } from 'fastify';
+import jwt from 'jsonwebtoken';
 import { createApp } from '../app.js';
 import prisma from '../lib/prisma.js';
 
@@ -158,4 +159,94 @@ test('Step 2.2 — PATCH PENDING request directly to CHECKED_IN (skipping APPROV
   // 3. Verify database status remains PENDING
   const dbRow = await prisma.visitorRequest.findUniqueOrThrow({ where: { id: created.id } });
   assert.equal(dbRow.status, 'PENDING');
+});
+
+test('Step 2.2 — GUARD can PATCH CHECKED_IN request to CHECKED_OUT', async () => {
+  // 1. Create a request and move it to CHECKED_IN
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/visitor-requests',
+    headers: { authorization: `Bearer ${guardToken}` },
+    payload: {
+      name: 'Exiting Visitor',
+      purpose: 'Visit',
+      visitorType: 'Guest',
+      flatId: FLAT_ID,
+    },
+  });
+  const created = (JSON.parse(createRes.body) as { visitorRequest: { id: string } }).visitorRequest;
+
+  await app.inject({
+    method: 'PATCH',
+    url: `/visitor-requests/${created.id}`,
+    headers: { authorization: `Bearer ${residentToken}` },
+    payload: { status: 'APPROVED' },
+  });
+
+  await app.inject({
+    method: 'PATCH',
+    url: `/visitor-requests/${created.id}`,
+    headers: { authorization: `Bearer ${guardToken}` },
+    payload: { status: 'CHECKED_IN' },
+  });
+
+  // 2. Guard PATCH to CHECKED_OUT
+  const patchRes = await app.inject({
+    method: 'PATCH',
+    url: `/visitor-requests/${created.id}`,
+    headers: { authorization: `Bearer ${guardToken}` },
+    payload: { status: 'CHECKED_OUT' },
+  });
+
+  assert.equal(patchRes.statusCode, 200, `Expected 200 OK, got ${patchRes.statusCode}`);
+  const body = JSON.parse(patchRes.body) as { visitorRequest: { status: string } };
+  assert.equal(body.visitorRequest.status, 'CHECKED_OUT');
+});
+
+test('Step 2.2 — GUARD from a different society gets 403 when trying to PATCH', async () => {
+  // We'll just create a new society, flat, and guard user manually in the DB for this test
+  const otherSociety = await prisma.society.create({ data: { name: 'Other Soc', address: 'Other' } });
+  const otherGuard = await prisma.user.create({
+    data: {
+      name: 'Other Guard',
+      email: `other.guard.${Date.now()}@portl.dev`,
+      passwordHash: 'hash', // fake
+      role: 'GUARD',
+      societyId: otherSociety.id,
+    }
+  });
+
+  // Generate a valid JWT for this other guard
+  const secret = process.env['JWT_SECRET']!;
+  const otherGuardToken = jwt.sign(
+    { userId: otherGuard.id, role: 'GUARD', societyId: otherSociety.id },
+    secret,
+    { expiresIn: '1h' }
+  );
+
+  // Use the PENDING request from previous test setup
+  const createRes = await app.inject({
+    method: 'POST',
+    url: '/visitor-requests',
+    headers: { authorization: `Bearer ${guardToken}` },
+    payload: {
+      name: 'Target Visitor',
+      purpose: 'Target',
+      visitorType: 'Guest',
+      flatId: FLAT_ID, // from the original society
+    },
+  });
+  const created = (JSON.parse(createRes.body) as { visitorRequest: { id: string } }).visitorRequest;
+
+  // Try to patch it with the OTHER guard's token
+  const patchRes = await app.inject({
+    method: 'PATCH',
+    url: `/visitor-requests/${created.id}`,
+    headers: { authorization: `Bearer ${otherGuardToken}` },
+    payload: { status: 'REJECTED' }, // trying to reject it
+  });
+
+  assert.equal(patchRes.statusCode, 403, `Expected 403 Forbidden, got ${patchRes.statusCode}`);
+  const body = JSON.parse(patchRes.body) as { error: string };
+  assert.ok(body.error.includes('Forbidden: you do not have permission'), 'Must be a scoping error');
 });
