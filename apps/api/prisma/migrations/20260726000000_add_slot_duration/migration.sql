@@ -1,0 +1,1 @@
+ALTER TABLE "Amenity" ADD COLUMN "slotDurationMinutes" INTEGER NOT NULL DEFAULT 60;

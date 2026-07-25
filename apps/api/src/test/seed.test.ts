@@ -120,7 +120,7 @@ test('Step 1.6 — ADMIN token calling GET /visitor-requests (requireRole RESIDE
   assert.match(res.body, /Forbidden/i, 'Response body should indicate Forbidden error');
 });
 
-test('Step 1.6 — GUARD token calling GET /visitor-requests returns 403 Forbidden', async () => {
+test('Step 1.6 — GUARD token calling GET /visitor-requests returns 200 OK (Guard History)', async () => {
   // Login as Guard
   const loginRes = await app.inject({
     method: 'POST',
@@ -129,12 +129,12 @@ test('Step 1.6 — GUARD token calling GET /visitor-requests returns 403 Forbidd
   });
   const { accessToken } = JSON.parse(loginRes.body) as { accessToken: string };
 
-  // Hit RESIDENT-only endpoint
+  // Hit endpoint
   const res = await app.inject({
     method: 'GET',
     url: '/visitor-requests',
     headers: { authorization: `Bearer ${accessToken}` },
   });
 
-  assert.equal(res.statusCode, 403, `Expected 403 for GUARD hitting RESIDENT route, got ${res.statusCode}: ${res.body}`);
+  assert.equal(res.statusCode, 200, `Expected 200 for GUARD hitting visitor history, got ${res.statusCode}: ${res.body}`);
 });
