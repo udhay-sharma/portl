@@ -69,6 +69,21 @@ export async function getMe(token: string): Promise<{ id: string; role: string; 
   return result.user;
 }
 
+export async function updatePushToken(token: string, expoPushToken: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/me/push-token`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ expoPushToken }),
+  });
+  if (!res.ok) {
+    check401(res);
+    throw new Error('Failed to update push token');
+  }
+}
+
 export interface VisitorRequest {
   id: string;
   name: string;

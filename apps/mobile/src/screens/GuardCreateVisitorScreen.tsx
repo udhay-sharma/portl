@@ -5,23 +5,17 @@ import { createVisitorRequest, type VisitorRequest } from '../lib/api';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { useAuth } from '../lib/auth';
 import { Card } from '../components/ui/Card';
 import { StatusBadge } from '../components/ui/StatusBadge';
 
 const VISITOR_TYPES = ['Delivery', 'Cab', 'Guest', 'Staff'];
 const SEEDED_FLAT_ID = 'c0000000-0000-0000-0000-000000000001'; // Flat 101 from Step 1.6 seed
 
-interface GuardCreateVisitorScreenProps {
-  token: string;
-  recentRequests: VisitorRequest[];
-  onVisitorCreated: (req: VisitorRequest) => void;
-}
-
-export function GuardCreateVisitorScreen({
-  token,
-  recentRequests,
-  onVisitorCreated,
-}: GuardCreateVisitorScreenProps) {
+export function GuardCreateVisitorScreen() {
+  const { token: authToken } = useAuth();
+  const token = authToken as string;
+  const [recentRequests, setRecentRequests] = useState<VisitorRequest[]>([]);
   const [name, setName] = useState('');
   const [purpose, setPurpose] = useState('');
   const [visitorType, setVisitorType] = useState('Delivery');
@@ -58,7 +52,7 @@ export function GuardCreateVisitorScreen({
     setLoading(true);
     try {
       const created = await createVisitorRequest(token, parsed.data);
-      onVisitorCreated(created);
+      setRecentRequests((prev) => [created, ...prev]);
       setName('');
       setPurpose('');
       setPhotoUrl('');

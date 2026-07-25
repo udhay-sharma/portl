@@ -7,18 +7,12 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import { useAuth } from '../lib/auth';
 
-interface ResidentIncomingRequestsScreenProps {
-  token: string;
-  flatId: string;
-  onDecisionMade?: (req: VisitorRequest) => void;
-}
-
-export function ResidentIncomingRequestsScreen({
-  token,
-  flatId,
-  onDecisionMade,
-}: ResidentIncomingRequestsScreenProps) {
+export function ResidentIncomingRequestsScreen() {
+  const { token: authToken, user } = useAuth();
+  const token = authToken as string;
+  const flatId = user?.flatId as string;
   const [requests, setRequests] = useState<VisitorRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -59,16 +53,13 @@ export function ResidentIncomingRequestsScreen({
         setRequests((prev) =>
           prev.map((r) => (r.id === decidedReq.id ? decidedReq : r))
         );
-        if (onDecisionMade) {
-          onDecisionMade(decidedReq);
-        }
       }
     );
 
     return () => {
       disconnect();
     };
-  }, [flatId, fetchRequests, onDecisionMade]);
+  }, [flatId, fetchRequests]);
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -83,10 +74,7 @@ export function ResidentIncomingRequestsScreen({
       const idempotencyKey = Crypto.randomUUID();
 
       const updated = await updateVisitorStatus(token, id, status, idempotencyKey);
-      setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
-      if (onDecisionMade) {
-        onDecisionMade(updated);
-      }
+      setRequests((prev) => prev.map((r) => (r.id === id ? updated : r)));
     } catch (err) {
       Alert.alert('Error', err instanceof Error ? err.message : `Failed to ${status.toLowerCase()} request`);
     } finally {

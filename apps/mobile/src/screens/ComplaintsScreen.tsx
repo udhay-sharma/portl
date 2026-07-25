@@ -6,18 +6,17 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
-
-interface ComplaintsScreenProps {
-  token: string;
-  role: 'RESIDENT' | 'ADMIN';
-}
+import { useAuth } from '../lib/auth';
 
 const NEXT_STATUS: Record<string, string> = {
   OPEN: 'IN_PROGRESS',
   IN_PROGRESS: 'RESOLVED',
 };
 
-export function ComplaintsScreen({ token, role }: ComplaintsScreenProps) {
+export function ComplaintsScreen() {
+  const { token: authToken, user } = useAuth();
+  const token = authToken as string;
+  const role = user?.role as 'RESIDENT' | 'ADMIN';
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

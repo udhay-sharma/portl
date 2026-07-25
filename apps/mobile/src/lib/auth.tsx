@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { View, ActivityIndicator, Text } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import * as SecureStore from 'expo-secure-store';
-import { getMe, setOnUnauthorized, type UserProfile, login as apiLogin } from './api';
+import { getMe, setOnUnauthorized, type UserProfile, login as apiLogin, updatePushToken } from './api';
 
 interface AuthContextType {
   token: string | null;
@@ -78,6 +79,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await SecureStore.setItemAsync('accessToken', res.accessToken);
       setToken(res.accessToken);
       setUser(res.user);
+
+      // New Push Token Logic
+      try {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        if (finalStatus === 'granted') {
+          const pushToken = (await Notifications.getExpoPushTokenAsync()).data;
+          await updatePushToken(res.accessToken, pushToken);
+          console.log('Successfully registered push token:', pushToken);
+        }
+      } catch (pushErr) {
+        console.warn('Failed to register push token:', pushErr);
+      }
     } finally {
       setIsLoading(false);
     }

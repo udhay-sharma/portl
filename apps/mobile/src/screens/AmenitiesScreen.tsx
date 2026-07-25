@@ -4,12 +4,11 @@ import { getAmenities, bookAmenity, getMe, type Amenity } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
+import { useAuth } from '../lib/auth';
 
-interface AmenitiesScreenProps {
-  token: string;
-}
-
-export function AmenitiesScreen({ token }: AmenitiesScreenProps) {
+export function AmenitiesScreen() {
+  const { token: authToken } = useAuth();
+  const token = authToken as string; // Screen is only mounted when authenticated
   const [amenities, setAmenities] = useState<Amenity[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

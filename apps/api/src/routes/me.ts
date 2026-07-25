@@ -32,6 +32,25 @@ const meRoutes: FastifyPluginAsync = async (fastify) => {
 
     return reply.status(200).send({ user });
   });
+  // -------------------------------------------------------------------------
+  // PUT /me/push-token
+  // Accepts a push token and saves it to the authenticated user's record
+  // -------------------------------------------------------------------------
+  fastify.put<{ Body: { expoPushToken: string } }>('/me/push-token', { preHandler: [requireAuth] }, async (request, reply) => {
+    const { expoPushToken } = request.body;
+    
+    if (!expoPushToken || typeof expoPushToken !== 'string') {
+      return reply.status(400).send({ error: 'expoPushToken string is required' });
+    }
+
+    const user = await prisma.user.update({
+      where: { id: request.user.userId },
+      data: { expoPushToken },
+      select: { id: true, expoPushToken: true },
+    });
+
+    return reply.status(200).send({ success: true, user });
+  });
 };
 
 export default meRoutes;

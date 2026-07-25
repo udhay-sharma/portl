@@ -3,15 +3,14 @@ import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator } from
 import { getNotices, createNotice, type Notice } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
+import { useAuth } from '../lib/auth';
 import { Input } from '../components/ui/Input';
 import { EmptyState } from '../components/ui/EmptyState';
 
-interface NoticesScreenProps {
-  token: string;
-  role: 'RESIDENT' | 'ADMIN';
-}
-
-export function NoticesScreen({ token, role }: NoticesScreenProps) {
+export function NoticesScreen() {
+  const { token: authToken, user } = useAuth();
+  const token = authToken as string;
+  const role = user?.role as 'RESIDENT' | 'ADMIN';
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

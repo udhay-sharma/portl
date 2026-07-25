@@ -4,12 +4,11 @@ import { getPolls, castVote, type Poll } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
+import { useAuth } from '../lib/auth';
 
-interface PollsScreenProps {
-  token: string;
-}
-
-export function PollsScreen({ token }: PollsScreenProps) {
+export function PollsScreen() {
+  const { token: authToken } = useAuth();
+  const token = authToken as string;
   const [polls, setPolls] = useState<Poll[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
