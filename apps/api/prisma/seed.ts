@@ -199,6 +199,24 @@ async function main() {
   });
   console.log(`  ✅ Amenity: ${tennisCourt.name} (${tennisCourt.slotDurationMinutes} mins)`);
 
+  // 8. Service Providers (Staff)
+  const staffData = [
+    { id: 'f0000000-0000-0000-0000-000000000001', name: 'Mario Rossi', category: 'Plumber', phone: '9001001001', notes: 'Emergency plumber' },
+    { id: 'f0000000-0000-0000-0000-000000000002', name: 'Luigi Verdi', category: 'Electrician', phone: '9002002002', notes: 'Available 9AM-5PM' },
+    { id: 'f0000000-0000-0000-0000-000000000003', name: 'Sparkle Cleaners', category: 'Housekeeping', phone: '9003003003', notes: 'Deep cleaning service' },
+    { id: 'f0000000-0000-0000-0000-000000000004', name: 'SecureTech', category: 'Security', phone: '9004004004', notes: 'CCTV and alarm support' },
+    { id: 'f0000000-0000-0000-0000-000000000005', name: 'Green Thumb', category: 'Gardener', phone: '9005005005', notes: 'Visits every Tuesday' },
+  ];
+
+  for (const staff of staffData) {
+    await prisma.serviceProvider.upsert({
+      where: { id: staff.id },
+      update: { ...staff, societyId: SOCIETY_ID },
+      create: { ...staff, societyId: SOCIETY_ID },
+    });
+    console.log(`  ✅ Staff: ${staff.name} (${staff.category})`);
+  }
+
   console.log('\n✨ Database seeding completed successfully.');
   console.log(`🔑 All seeded users can log in with password: "${KNOWN_PASSWORD}"`);
 }

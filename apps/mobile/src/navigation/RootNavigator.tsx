@@ -5,6 +5,7 @@ import { ResidentNavigator } from './ResidentNavigator';
 import { AdminNavigator } from './AdminNavigator';
 import { GuardNavigator } from './GuardNavigator';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { StaffScreen } from '../screens/StaffScreen';
 import { useAuth } from '../lib/auth';
 import { View, ActivityIndicator } from 'react-native';
 
@@ -42,6 +43,9 @@ export function RootNavigator() {
           </Stack.Group>
           <Stack.Group screenOptions={{ presentation: 'modal', headerShown: true, headerStyle: { backgroundColor: '#1e293b' }, headerTintColor: '#fff', headerTitle: 'Settings' }}>
             <Stack.Screen name="Settings" component={SettingsScreen} />
+          </Stack.Group>
+          <Stack.Group screenOptions={{ presentation: 'modal', headerShown: true, headerStyle: { backgroundColor: '#1e293b' }, headerTintColor: '#fff', headerTitle: 'Staff Directory' }}>
+            <Stack.Screen name="Staff" component={StaffScreen} />
           </Stack.Group>
         </>
       )}

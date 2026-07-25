@@ -13,12 +13,9 @@ function check401(res: Response) {
   }
 }
 function getApiBaseUrl(): string {
-  // 0. Production override — set this for EAS/APK builds, takes priority over everything below
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
-
-  // 1. If running in Expo Go or Expo dev build over Wi-Fi/LAN, extract the exact host IP address
   const hostUri =
     Constants.expoConfig?.hostUri ||
     (Constants as any).manifest2?.extra?.expoGo?.debuggerHost ||
@@ -29,17 +26,30 @@ function getApiBaseUrl(): string {
       return `http://${ip}:3000`;
     }
   }
-
-  // 2. Android emulator fallback
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:3000';
   }
-
-  // 3. Web or iOS simulator default
   return 'http://localhost:3000';
 }
 
 export const API_BASE_URL = getApiBaseUrl();
+console.log('API_BASE_URL configured as:', API_BASE_URL);
+
+// Helper to prevent infinite hangs
+async function fetchWithTimeout(resource: RequestInfo, options: RequestInit & { timeout?: number } = {}) {
+  const { timeout = 8000 } = options;
+  
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+
+  const response = await fetch(resource, {
+    ...options,
+    signal: controller.signal
+  });
+  clearTimeout(id);
+
+  return response;
+}
 
 export interface UserProfile {
   id: string;
@@ -84,6 +94,83 @@ export async function updatePushToken(token: string, expoPushToken: string): Pro
   }
 }
 
+// ---------------------------------------------------------------------------
+// Staff & Service Providers
+// ---------------------------------------------------------------------------
+
+export interface ServiceProvider {
+  id: string;
+  name: string;
+  category: string;
+  phone: string;
+  notes?: string;
+}
+
+export async function getStaff(token: string): Promise<ServiceProvider[]> {
+  const res = await fetch(`${API_BASE_URL}/staff`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    check401(res);
+    throw new Error('Failed to fetch staff directory');
+  }
+  const data = await res.json();
+  return data.providers;
+}
+
+export async function createStaff(
+  token: string,
+  payload: { name: string; category: string; phone: string; notes?: string }
+): Promise<ServiceProvider> {
+  const res = await fetch(`${API_BASE_URL}/staff`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    check401(res);
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to create staff member');
+  }
+  return res.json();
+}
+
+export async function updateStaff(
+  token: string,
+  id: string,
+  payload: Partial<{ name: string; category: string; phone: string; notes: string }>
+): Promise<ServiceProvider> {
+  const res = await fetch(`${API_BASE_URL}/staff/${id}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    check401(res);
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to update staff member');
+  }
+  return res.json();
+}
+
+export async function deleteStaff(token: string, id: string): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/staff/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    check401(res);
+    const err = await res.json();
+    throw new Error(err.error || 'Failed to delete staff member');
+  }
+}
+
 export interface VisitorRequest {
   id: string;
   name: string;
@@ -98,7 +185,8 @@ export interface VisitorRequest {
 }
 
 export async function login(credential: string, password = 'password123'): Promise<LoginResponse> {
-  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+  console.log(`Attempting login to ${API_BASE_URL}/auth/login...`);
+  const res = await fetchWithTimeout(`${API_BASE_URL}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ credential, password }),
@@ -111,7 +199,7 @@ export async function login(credential: string, password = 'password123'): Promi
   const { accessToken } = await res.json() as { accessToken: string };
 
   // Fetch the user profile from /me using the just-issued token
-  const meRes = await fetch(`${API_BASE_URL}/me`, {
+  const meRes = await fetchWithTimeout(`${API_BASE_URL}/me`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   if (!meRes.ok) {
@@ -381,10 +469,11 @@ export interface Amenity {
 export interface AmenityBooking {
   id: string;
   amenityId: string;
+  bookedByUserId: string;
   date: string;
   startTime: string;
   endTime: string;
-  createdAt: string;
+  amenity: Amenity;
 }
 
 export async function getAmenities(token: string): Promise<Amenity[]> {

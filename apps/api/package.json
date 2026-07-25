@@ -27,7 +27,8 @@
     "test:poll": "cross-env NODE_ENV=test node --test --import tsx/esm src/test/poll.test.ts",
     "test:complaint": "cross-env NODE_ENV=test node --test --import tsx/esm src/test/complaint.test.ts",
     "test:amenity": "cross-env NODE_ENV=test node --test --import tsx/esm src/test/amenity.test.ts",
-    "test:push-token": "cross-env NODE_ENV=test node --test --import tsx/esm src/test/push-token.test.ts"
+    "test:push-token": "cross-env NODE_ENV=test node --test --import tsx/esm src/test/push-token.test.ts",
+    "test:staff": "cross-env NODE_ENV=test node --test --import tsx/esm src/test/staff.test.ts"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

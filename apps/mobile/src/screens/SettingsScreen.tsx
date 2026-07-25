@@ -2,10 +2,12 @@ import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { useAuth } from '../lib/auth';
 import { Card } from '../components/ui/Card';
-import { User, Mail, Home, Shield, LogOut } from 'lucide-react-native';
+import { User, Mail, Home, Shield, LogOut, Users } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 
 export function SettingsScreen() {
   const { user, logout } = useAuth();
+  const navigation = useNavigation<any>();
 
   if (!user) return null;
 
@@ -62,6 +64,21 @@ export function SettingsScreen() {
               </View>
             </View>
           )}
+        </Card>
+
+        <Card className="mb-6 p-2">
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Staff')}
+            className="flex-row items-center p-3"
+          >
+            <View className="bg-surface p-2 rounded-full mr-4 border border-border">
+              <Users color="#fff" size={20} />
+            </View>
+            <View className="flex-1">
+              <Text className="text-white font-bold text-base">Staff Directory</Text>
+              <Text className="text-muted text-xs">View society staff & service providers</Text>
+            </View>
+          </TouchableOpacity>
         </Card>
 
         <TouchableOpacity

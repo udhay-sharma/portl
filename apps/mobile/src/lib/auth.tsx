@@ -73,42 +73,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (credential: string, password?: string) => {
-    setIsLoading(true);
-    try {
-      const res = await apiLogin(credential, password);
-      await SecureStore.setItemAsync('accessToken', res.accessToken);
-      setToken(res.accessToken);
-      setUser(res.user);
+    let accessToken = '';
+    
+    // Perform login API call
+    const res = await apiLogin(credential, password);
+    await SecureStore.setItemAsync('accessToken', res.accessToken);
+    accessToken = res.accessToken;
+    setToken(res.accessToken);
+    setUser(res.user);
 
-      // New Push Token Logic
-      try {
-        const { status: existingStatus } = await Notifications.getPermissionsAsync();
-        let finalStatus = existingStatus;
-        if (existingStatus !== 'granted') {
-          const { status } = await Notifications.requestPermissionsAsync();
-          finalStatus = status;
+    // New Push Token Logic - Run in background so it doesn't block UI if it hangs
+    if (accessToken) {
+      (async () => {
+        try {
+          const { status: existingStatus } = await Notifications.getPermissionsAsync();
+          let finalStatus = existingStatus;
+          if (existingStatus !== 'granted') {
+            const { status } = await Notifications.requestPermissionsAsync();
+            finalStatus = status;
+          }
+          if (finalStatus === 'granted') {
+            const pushToken = (await Notifications.getExpoPushTokenAsync()).data;
+            await updatePushToken(accessToken, pushToken);
+            console.log('Successfully registered push token:', pushToken);
+          }
+        } catch (pushErr) {
+          console.warn('Failed to register push token:', pushErr);
         }
-        if (finalStatus === 'granted') {
-          const pushToken = (await Notifications.getExpoPushTokenAsync()).data;
-          await updatePushToken(res.accessToken, pushToken);
-          console.log('Successfully registered push token:', pushToken);
-        }
-      } catch (pushErr) {
-        console.warn('Failed to register push token:', pushErr);
-      }
-    } finally {
-      setIsLoading(false);
+      })();
     }
   };
-
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#F8F9FA' }}>
-        <ActivityIndicator size="large" color="#C99A3C" />
-        <Text style={{ marginTop: 16, color: '#6C757D', fontWeight: '600' }}>Starting Portl...</Text>
-      </View>
-    );
-  }
 
   return (
     <AuthContext.Provider value={{ token, user, isLoading, login, logout }}>
