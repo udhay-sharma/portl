@@ -3,21 +3,21 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { NoticesScreen } from '../screens/NoticesScreen';
 import { ComplaintsScreen } from '../screens/ComplaintsScreen';
 import { AmenitiesScreen } from '../screens/AmenitiesScreen';
-import { Bell, MessageSquare, Coffee, LogOut } from 'lucide-react-native';
+import { Bell, MessageSquare, Coffee, Settings } from 'lucide-react-native';
 import { TouchableOpacity } from 'react-native';
-import { useAuth } from '../lib/auth';
+import { useNavigation } from '@react-navigation/native';
 
 const Tab = createBottomTabNavigator();
 
 export function AdminNavigator() {
-  const { logout } = useAuth();
+  const navigation = useNavigation<any>();
 
   return (
     <Tab.Navigator
       screenOptions={{
         headerRight: () => (
-          <TouchableOpacity onPress={logout} style={{ marginRight: 16 }}>
-            <LogOut color="#ef4444" size={24} />
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={{ marginRight: 16 }}>
+            <Settings color="#fff" size={24} />
           </TouchableOpacity>
         ),
         headerShown: true,
