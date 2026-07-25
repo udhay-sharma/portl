@@ -13,3 +13,7 @@ export const PollVoteSchema = z.object({
 });
 
 export type PollVoteInput = z.infer<typeof PollVoteSchema>;
+
+export const UpdatePollSchema = CreatePollSchema.partial();
+export type UpdatePollInput = z.infer<typeof UpdatePollSchema>;
+

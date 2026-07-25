@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getComplaints, createComplaint, updateComplaintStatus, type Complaint } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -7,6 +8,9 @@ import { Input } from '../components/ui/Input';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useAuth } from '../lib/auth';
+import { Settings } from 'lucide-react-native';
+import { TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 const NEXT_STATUS: Record<string, string> = {
   OPEN: 'IN_PROGRESS',
@@ -15,6 +19,7 @@ const NEXT_STATUS: Record<string, string> = {
 
 export function ComplaintsScreen() {
   const { token: authToken, user } = useAuth();
+  const navigation = useNavigation<any>();
   const token = authToken as string;
   const role = user?.role as 'RESIDENT' | 'ADMIN';
   const [complaints, setComplaints] = useState<Complaint[]>([]);
@@ -90,17 +95,24 @@ export function ComplaintsScreen() {
   const headerBg = role === 'ADMIN' ? 'bg-admin' : 'bg-resident';
 
   return (
-    <ScrollView
-      className="flex-1 bg-bg"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-    >
-      <View className={`${headerBg} p-md pb-4`}>
-        <Text className="text-white font-bold text-xl">Complaints</Text>
-        <Text className="text-white text-xs opacity-90 mt-1">
-          {role === 'ADMIN'
-            ? 'Review and manage resident complaints.'
-            : 'Submit and track your complaints.'}
-        </Text>
+    <SafeAreaView className="flex-1 bg-bg">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+        <ScrollView
+          className="flex-1"
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        >
+      <View className={`${headerBg} p-md pb-4 flex-row justify-between items-start`}>
+        <View className="flex-1 mr-4">
+          <Text className="text-white font-bold text-xl">Complaints</Text>
+          <Text className="text-white text-xs opacity-90 mt-1">
+            {role === 'ADMIN'
+              ? 'Review and manage resident complaints.'
+              : 'Submit and track your complaints.'}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('Settings')} className="bg-white/20 p-2 rounded-full">
+          <Settings color="#ffffff" size={20} />
+        </TouchableOpacity>
       </View>
 
       <View className="p-md">
@@ -196,6 +208,8 @@ export function ComplaintsScreen() {
           })
         )}
       </View>
-    </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

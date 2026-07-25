@@ -29,6 +29,20 @@ const complaintRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // -------------------------------------------------------------------------
+  // GET /complaints/count
+  // Admin only. Returns the count of OPEN and IN_PROGRESS complaints.
+  // -------------------------------------------------------------------------
+  fastify.get(
+    '/complaints/count',
+    { preHandler: [requireAuth, requireRole('ADMIN')] },
+    async (request, reply) => {
+      const { societyId } = request.user;
+      const count = await complaintService.getUnresolvedComplaintsCountBySociety(societyId);
+      return reply.status(200).send({ count });
+    }
+  );
+
+  // -------------------------------------------------------------------------
   // POST /complaints
   // Resident only. Creates a new complaint for their flat.
   // -------------------------------------------------------------------------

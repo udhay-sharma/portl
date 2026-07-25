@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { Card } from '../components/ui/Card';
 import { User, Mail, Home, Shield, LogOut, Users } from 'lucide-react-native';
@@ -12,12 +13,13 @@ export function SettingsScreen() {
   if (!user) return null;
 
   return (
-    <ScrollView className="flex-1 bg-bg">
+    <SafeAreaView className="flex-1 bg-bg">
+      <ScrollView className="flex-1 bg-bg">
       <View className="p-md">
-        <Text className="text-white font-bold text-2xl mb-6">Settings</Text>
+        <Text className="text-text font-bold text-2xl mb-6">Settings</Text>
 
         <Card className="mb-6 p-4">
-          <Text className="text-white font-bold text-lg mb-4 border-b border-border pb-2">
+          <Text className="text-text font-bold text-lg mb-4 border-b border-border pb-2">
             Profile Information
           </Text>
 
@@ -75,7 +77,7 @@ export function SettingsScreen() {
               <Users color="#fff" size={20} />
             </View>
             <View className="flex-1">
-              <Text className="text-white font-bold text-base">Staff Directory</Text>
+              <Text className="text-text font-bold text-base">Staff Directory</Text>
               <Text className="text-muted text-xs">View society staff & service providers</Text>
             </View>
           </TouchableOpacity>
@@ -92,6 +94,7 @@ export function SettingsScreen() {
           Logging out will clear your session securely.
         </Text>
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

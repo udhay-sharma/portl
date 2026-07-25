@@ -1,6 +1,6 @@
 import prisma from '../lib/prisma.js';
-import type { AmenityBookingInput } from '@portl/shared';
-import type { AmenityBooking } from '../generated/prisma/client.js';
+import type { AmenityBookingInput, CreateAmenityInput, UpdateAmenityInput } from '@portl/shared';
+import type { AmenityBooking, Amenity } from '../generated/prisma/client.js';
 
 export async function bookAmenity(
   amenityId: string,
@@ -32,4 +32,47 @@ export async function bookAmenity(
   });
 
   return booking;
+}
+
+export async function createAmenity(
+  societyId: string,
+  data: CreateAmenityInput
+): Promise<Amenity> {
+  return prisma.amenity.create({
+    data: {
+      ...data,
+      societyId,
+    },
+  });
+}
+
+export async function updateAmenity(
+  id: string,
+  societyId: string,
+  data: UpdateAmenityInput
+): Promise<Amenity | null> {
+  const existing = await prisma.amenity.findFirst({
+    where: { id, societyId },
+  });
+  if (!existing) return null;
+
+  return prisma.amenity.update({
+    where: { id },
+    data,
+  });
+}
+
+export async function deleteAmenity(
+  id: string,
+  societyId: string
+): Promise<boolean> {
+  const existing = await prisma.amenity.findFirst({
+    where: { id, societyId },
+  });
+  if (!existing) return false;
+
+  await prisma.amenity.delete({
+    where: { id },
+  });
+  return true;
 }

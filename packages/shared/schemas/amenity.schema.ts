@@ -15,3 +15,13 @@ export const AmenityBookingSchema = z.object({
 });
 
 export type AmenityBookingInput = z.infer<typeof AmenityBookingSchema>;
+
+export const CreateAmenitySchema = z.object({
+  name: z.string().min(2, 'Name is too short').max(100, 'Name is too long'),
+  description: z.string().optional(),
+  slotDurationMinutes: z.number().int().positive().default(60),
+});
+export type CreateAmenityInput = z.infer<typeof CreateAmenitySchema>;
+
+export const UpdateAmenitySchema = CreateAmenitySchema.partial();
+export type UpdateAmenityInput = z.infer<typeof UpdateAmenitySchema>;

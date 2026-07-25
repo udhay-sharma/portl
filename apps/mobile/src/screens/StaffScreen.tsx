@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Alert, Modal, TextInput, Linking } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, RefreshControl, Alert, Modal, TextInput, Linking, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../lib/auth';
 import { getStaff, createStaff, updateStaff, deleteStaff, type ServiceProvider } from '../lib/api';
 import { Card } from '../components/ui/Card';
@@ -106,7 +107,7 @@ export function StaffScreen() {
   };
 
   return (
-    <View className="flex-1 bg-bg">
+    <SafeAreaView className="flex-1 bg-bg">
       <ScrollView
         className="flex-1"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
@@ -126,7 +127,7 @@ export function StaffScreen() {
             <Card key={provider.id} className="mb-4 p-4">
               <View className="flex-row justify-between items-start mb-2">
                 <View className="flex-1">
-                  <Text className="text-white font-bold text-lg">{provider.name}</Text>
+                  <Text className="text-text font-bold text-lg">{provider.name}</Text>
                   <Text className="text-muted font-semibold text-xs mb-1 uppercase tracking-wider">
                     {provider.category}
                   </Text>
@@ -185,16 +186,16 @@ export function StaffScreen() {
 
       {/* Admin Form Modal */}
       <Modal visible={modalVisible} animationType="slide" transparent={true}>
-        <View className="flex-1 justify-end bg-black/60">
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 justify-end bg-black/60">
           <View className="bg-surface rounded-t-3xl p-6 min-h-[50%]">
-            <Text className="text-white font-bold text-xl mb-6">
+            <Text className="text-text font-bold text-xl mb-6">
               {editingProvider ? 'Edit Staff' : 'Add Staff Member'}
             </Text>
 
             <View className="mb-4">
               <Text className="text-muted text-xs mb-1 ml-1">Name *</Text>
               <TextInput
-                className="bg-bg text-white px-4 py-3 rounded-control border border-border"
+                className="bg-bg text-text px-4 py-3 rounded-control border border-border"
                 placeholder="e.g. John Smith"
                 placeholderTextColor="#64748b"
                 value={formData.name}
@@ -205,7 +206,7 @@ export function StaffScreen() {
             <View className="mb-4">
               <Text className="text-muted text-xs mb-1 ml-1">Category / Role *</Text>
               <TextInput
-                className="bg-bg text-white px-4 py-3 rounded-control border border-border"
+                className="bg-bg text-text px-4 py-3 rounded-control border border-border"
                 placeholder="e.g. Plumber, Electrician"
                 placeholderTextColor="#64748b"
                 value={formData.category}
@@ -216,7 +217,7 @@ export function StaffScreen() {
             <View className="mb-4">
               <Text className="text-muted text-xs mb-1 ml-1">Phone Number *</Text>
               <TextInput
-                className="bg-bg text-white px-4 py-3 rounded-control border border-border"
+                className="bg-bg text-text px-4 py-3 rounded-control border border-border"
                 placeholder="e.g. 555-0199"
                 placeholderTextColor="#64748b"
                 keyboardType="phone-pad"
@@ -228,7 +229,7 @@ export function StaffScreen() {
             <View className="mb-6">
               <Text className="text-muted text-xs mb-1 ml-1">Notes (Optional)</Text>
               <TextInput
-                className="bg-bg text-white px-4 py-3 rounded-control border border-border"
+                className="bg-bg text-text px-4 py-3 rounded-control border border-border"
                 placeholder="e.g. Available on weekends"
                 placeholderTextColor="#64748b"
                 value={formData.notes}
@@ -252,8 +253,8 @@ export function StaffScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 }

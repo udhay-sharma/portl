@@ -1,14 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { getNotices, createNotice, type Notice } from '../lib/api';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { useAuth } from '../lib/auth';
 import { Input } from '../components/ui/Input';
 import { EmptyState } from '../components/ui/EmptyState';
+import { Settings } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 
 export function NoticesScreen() {
   const { token: authToken, user } = useAuth();
+  const navigation = useNavigation<any>();
   const token = authToken as string;
   const role = user?.role as 'RESIDENT' | 'ADMIN';
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -71,15 +75,22 @@ export function NoticesScreen() {
   const headerBg = role === 'ADMIN' ? 'bg-admin' : 'bg-resident';
 
   return (
-    <ScrollView
-      className="flex-1 bg-bg"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-    >
-      <View className={`${headerBg} p-md pb-4`}>
-        <Text className="text-white font-bold text-xl">Notices</Text>
-        <Text className="text-white text-xs opacity-90 mt-1">
-          {role === 'ADMIN' ? 'Create and manage society notices.' : 'Stay updated with society announcements.'}
-        </Text>
+    <SafeAreaView className="flex-1 bg-bg">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+        <ScrollView
+          className="flex-1"
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+        >
+      <View className={`${headerBg} p-md pb-4 flex-row justify-between items-start`}>
+        <View className="flex-1 mr-4">
+          <Text className="text-white font-bold text-xl">Notices</Text>
+          <Text className="text-white text-xs opacity-90 mt-1">
+            {role === 'ADMIN' ? 'Create and manage society notices.' : 'Stay updated with society announcements.'}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('Settings')} className="bg-white/20 p-2 rounded-full">
+          <Settings color="#ffffff" size={20} />
+        </TouchableOpacity>
       </View>
 
       <View className="p-md">
@@ -140,6 +151,8 @@ export function NoticesScreen() {
           ))
         )}
       </View>
-    </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

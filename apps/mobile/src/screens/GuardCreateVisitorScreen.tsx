@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { VisitorRequestSchema, type VisitorRequestInput } from '@portl/shared';
 import { createVisitorRequest, getVisitorRequests, updateVisitorStatus, searchFlats, type VisitorRequest, type FlatSearchResult } from '../lib/api';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -8,12 +9,15 @@ import { Button } from '../components/ui/Button';
 import { useAuth } from '../lib/auth';
 import { Card } from '../components/ui/Card';
 import { StatusBadge } from '../components/ui/StatusBadge';
+import { Settings } from 'lucide-react-native';
+import { useNavigation } from '@react-navigation/native';
 
 const VISITOR_TYPES = ['Delivery', 'Cab', 'Guest', 'Staff'];
 const SEEDED_FLAT_ID = 'c0000000-0000-0000-0000-000000000001'; // Flat 101 from Step 1.6 seed
 
 export function GuardCreateVisitorScreen() {
   const { token: authToken } = useAuth();
+  const navigation = useNavigation<any>();
   const token = authToken as string;
   const [visitorRequests, setVisitorRequests] = useState<VisitorRequest[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -127,12 +131,19 @@ export function GuardCreateVisitorScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-bg">
-      <View className="bg-guard p-md pb-4">
-        <Text className="text-white font-bold text-xl">Guard Check-in (Gate 1)</Text>
-        <Text className="text-white text-xs opacity-90 mt-1">
-          Register visitor entry. Requests are sent instantly to Resident.
-        </Text>
+    <SafeAreaView className="flex-1 bg-bg">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
+        <ScrollView className="flex-1 bg-bg">
+      <View className="bg-guard p-md pb-4 flex-row justify-between items-start">
+        <View className="flex-1 mr-4">
+          <Text className="text-white font-bold text-xl">Guard Check-in (Gate 1)</Text>
+          <Text className="text-white text-xs opacity-90 mt-1">
+            Register visitor entry. Requests are sent instantly to Resident.
+          </Text>
+        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('Settings')} className="bg-white/20 p-2 rounded-full">
+          <Settings color="#ffffff" size={20} />
+        </TouchableOpacity>
       </View>
 
       <View className="p-md">
@@ -305,6 +316,8 @@ export function GuardCreateVisitorScreen() {
           ))
         )}
       </View>
-    </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

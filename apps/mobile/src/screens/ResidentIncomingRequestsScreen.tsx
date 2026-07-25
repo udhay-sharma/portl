@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, ScrollView, RefreshControl, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Crypto from 'expo-crypto';
 import { getVisitorRequests, updateVisitorStatus, type VisitorRequest } from '../lib/api';
 import { connectSocket } from '../lib/socket';
@@ -8,9 +9,13 @@ import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { StatusBadge } from '../components/ui/StatusBadge';
 import { useAuth } from '../lib/auth';
+import { Settings } from 'lucide-react-native';
+import { TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 export function ResidentIncomingRequestsScreen() {
   const { token: authToken, user } = useAuth();
+  const navigation = useNavigation<any>();
   const token = authToken as string;
   const flatId = user?.flatId as string;
   const [requests, setRequests] = useState<VisitorRequest[]>([]);
@@ -86,15 +91,21 @@ export function ResidentIncomingRequestsScreen() {
   const pastRequests = requests.filter((r) => r.status !== 'PENDING');
 
   return (
-    <ScrollView
-      className="flex-1 bg-bg"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
-    >
-      <View className="bg-resident p-md pb-4">
-        <Text className="text-white font-bold text-xl">Resident Portal (Flat 101)</Text>
-        <Text className="text-white text-xs opacity-90 mt-1">
-          Approve or reject entry requests waiting at the gate.
-        </Text>
+    <SafeAreaView className="flex-1 bg-bg">
+      <ScrollView
+        className="flex-1"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
+      <View className="bg-resident p-md pb-4 flex-row justify-between items-start">
+        <View className="flex-1 mr-4">
+          <Text className="text-white font-bold text-xl">Resident Portal (Flat 101)</Text>
+          <Text className="text-white text-xs opacity-90 mt-1">
+            Approve or reject entry requests waiting at the gate.
+          </Text>
+        </View>
+        <TouchableOpacity onPress={() => navigation.navigate('Settings')} className="bg-white/20 p-2 rounded-full">
+          <Settings color="#ffffff" size={20} />
+        </TouchableOpacity>
       </View>
 
       <View className="p-md">
@@ -190,6 +201,7 @@ export function ResidentIncomingRequestsScreen() {
           ))
         )}
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 }

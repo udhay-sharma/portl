@@ -18,7 +18,7 @@ export function GuardNavigator() {
             <Settings color="#fff" size={24} />
           </TouchableOpacity>
         ),
-        headerShown: true,
+        headerShown: false,
         tabBarActiveTintColor: '#22c55e', // Guard theme color
         tabBarInactiveTintColor: 'gray',
         headerStyle: { backgroundColor: '#1e293b' },

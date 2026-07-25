@@ -44,6 +44,58 @@ const pollRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // -------------------------------------------------------------------------
+  // PATCH /polls/:id
+  // Admin only. Updates an existing poll.
+  // -------------------------------------------------------------------------
+  fastify.patch(
+    '/polls/:id',
+    { preHandler: [requireAuth, requireRole('ADMIN')] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      // @ts-ignore - UpdatePollSchema is not explicitly exported from index if we didn't add it to index, but it should be available if we use CreatePollSchema.partial
+      const parsed = CreatePollSchema.partial().safeParse(request.body);
+      
+      if (!parsed.success) {
+        return reply.status(400).send({
+          error: 'Validation failed',
+          details: parsed.error.flatten().fieldErrors,
+        });
+      }
+
+      const poll = await pollService.updatePoll(id, parsed.data);
+      return reply.status(200).send({ poll });
+    }
+  );
+
+  // -------------------------------------------------------------------------
+  // DELETE /polls/:id
+  // Admin only. Deletes a poll.
+  // -------------------------------------------------------------------------
+  fastify.delete(
+    '/polls/:id',
+    { preHandler: [requireAuth, requireRole('ADMIN')] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      await pollService.deletePoll(id);
+      return reply.status(204).send();
+    }
+  );
+
+  // -------------------------------------------------------------------------
+  // POST /polls/:id/end
+  // Admin only. Ends a poll immediately.
+  // -------------------------------------------------------------------------
+  fastify.post(
+    '/polls/:id/end',
+    { preHandler: [requireAuth, requireRole('ADMIN')] },
+    async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const poll = await pollService.endPoll(id);
+      return reply.status(200).send({ poll });
+    }
+  );
+
+  // -------------------------------------------------------------------------
   // POST /polls/:id/vote
   // Resident only. Casts a vote on a poll.
   // -------------------------------------------------------------------------

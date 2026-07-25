@@ -362,6 +362,8 @@ export interface Poll {
   results: PollResult[];
   createdBy?: { name: string };
   createdAt: string;
+  endsAt: string | null;
+  votes?: { userId: string; selectedOption: string; user: { name: string } }[];
 }
 
 export async function getPolls(token: string): Promise<Poll[]> {
@@ -375,6 +377,81 @@ export async function getPolls(token: string): Promise<Poll[]> {
   }
   const result = await res.json();
   return result.polls;
+}
+
+export async function createPoll(
+  token: string,
+  data: { question: string; options: string[] }
+): Promise<Poll> {
+  const res = await fetch(`${API_BASE_URL}/polls`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    check401(res);
+    const err = await res.json().catch(() => ({ error: 'Creation failed' }));
+    throw new Error(err.error || err.message || 'Failed to create poll');
+  }
+  const result = await res.json();
+  return result.poll;
+}
+
+export async function updatePoll(
+  token: string,
+  id: string,
+  data: Partial<{ question: string; options: string[] }>
+): Promise<Poll> {
+  const res = await fetch(`${API_BASE_URL}/polls/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    check401(res);
+    const err = await res.json().catch(() => ({ message: 'Update failed' }));
+    throw new Error(err.message || err.error || 'Failed to update poll');
+  }
+  const result = await res.json();
+  return result.poll;
+}
+
+export async function deletePoll(
+  token: string,
+  id: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/polls/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    check401(res);
+    const err = await res.json().catch(() => ({ message: 'Deletion failed' }));
+    throw new Error(err.message || err.error || 'Failed to delete poll');
+  }
+}
+
+export async function endPoll(
+  token: string,
+  id: string
+): Promise<Poll> {
+  const res = await fetch(`${API_BASE_URL}/polls/${id}/end`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    check401(res);
+    const err = await res.json().catch(() => ({ message: 'End failed' }));
+    throw new Error(err.message || err.error || 'Failed to end poll');
+  }
+  const result = await res.json();
+  return result.poll;
 }
 
 export async function castVote(
@@ -471,6 +548,19 @@ export async function updateComplaintStatus(
   return result.complaint;
 }
 
+export async function getComplaintCount(token: string): Promise<number> {
+  const res = await fetch(`${API_BASE_URL}/complaints/count`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    check401(res);
+    throw new Error('Failed to fetch complaint count');
+  }
+  const result = await res.json();
+  return result.count;
+}
+
 // ---------------------------------------------------------------------------
 // Amenities
 // ---------------------------------------------------------------------------
@@ -533,4 +623,62 @@ export async function bookAmenity(
   }
   const result = await res.json();
   return result.booking;
+}
+
+export async function createAmenity(
+  token: string,
+  data: { name: string; description?: string; slotDurationMinutes: number }
+): Promise<Amenity> {
+  const res = await fetch(`${API_BASE_URL}/amenities`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    check401(res);
+    const err = await res.json().catch(() => ({ message: 'Creation failed' }));
+    throw new Error(err.message || err.error || 'Failed to create amenity');
+  }
+  const result = await res.json();
+  return result.amenity;
+}
+
+export async function updateAmenity(
+  token: string,
+  id: string,
+  data: Partial<{ name: string; description: string; slotDurationMinutes: number }>
+): Promise<Amenity> {
+  const res = await fetch(`${API_BASE_URL}/amenities/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    check401(res);
+    const err = await res.json().catch(() => ({ message: 'Update failed' }));
+    throw new Error(err.message || err.error || 'Failed to update amenity');
+  }
+  const result = await res.json();
+  return result.amenity;
+}
+
+export async function deleteAmenity(
+  token: string,
+  id: string
+): Promise<void> {
+  const res = await fetch(`${API_BASE_URL}/amenities/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    check401(res);
+    const err = await res.json().catch(() => ({ message: 'Deletion failed' }));
+    throw new Error(err.message || err.error || 'Failed to delete amenity');
+  }
 }

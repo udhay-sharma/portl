@@ -10,7 +10,7 @@ import redis from '../lib/redis.js';
 
 let app: FastifyInstance;
 let residentAToken: string;
-let residentBToken: string;
+let adminToken: string;
 let amenityId: string;
 let societyId: string;
 
@@ -26,6 +26,14 @@ before(async () => {
     payload: { credential: 'resident@portl.dev', password: 'password123' },
   });
   residentAToken = JSON.parse(residentARes.body).accessToken;
+
+  // Login Admin
+  const adminRes = await app.inject({
+    method: 'POST',
+    url: '/auth/login',
+    payload: { credential: 'admin@portl.dev', password: 'password123' },
+  });
+  adminToken = JSON.parse(adminRes.body).accessToken;
   
   // Decode JWT to get societyId (base64 string)
   const payloadBase64 = residentAToken.split('.')[1];
@@ -133,4 +141,73 @@ test('Step 4.4 Amenities — Allows concurrent bookings for DIFFERENT slots on s
   // BOTH MUST succeed (201) because they don't overlap
   assert.equal(res1.statusCode, 201);
   assert.equal(res2.statusCode, 201);
+});
+
+test('Step 4.5 Amenities — Admin can create an amenity', async () => {
+  const res = await app.inject({
+    method: 'POST',
+    url: `/amenities`,
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: {
+      name: 'Swimming Pool',
+      slotDurationMinutes: 120,
+    },
+  });
+  assert.equal(res.statusCode, 201);
+  const body = JSON.parse(res.body);
+  assert.equal(body.amenity.name, 'Swimming Pool');
+  assert.equal(body.amenity.slotDurationMinutes, 120);
+});
+
+test('Step 4.5 Amenities — Resident gets 403 trying to create amenity', async () => {
+  const res = await app.inject({
+    method: 'POST',
+    url: `/amenities`,
+    headers: { authorization: `Bearer ${residentAToken}` },
+    payload: {
+      name: 'Gym',
+    },
+  });
+  assert.equal(res.statusCode, 403);
+});
+
+test('Step 4.5 Amenities — Admin can update an amenity', async () => {
+  const res = await app.inject({
+    method: 'PATCH',
+    url: `/amenities/${amenityId}`,
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: {
+      name: 'Super Clubhouse',
+    },
+  });
+  assert.equal(res.statusCode, 200);
+  const body = JSON.parse(res.body);
+  assert.equal(body.amenity.name, 'Super Clubhouse');
+});
+
+test('Step 4.5 Amenities — Admin can delete an amenity', async () => {
+  // First create a temporary amenity
+  const tempAmenityRes = await app.inject({
+    method: 'POST',
+    url: `/amenities`,
+    headers: { authorization: `Bearer ${adminToken}` },
+    payload: { name: 'Temp Amenity' },
+  });
+  const tempAmenityId = JSON.parse(tempAmenityRes.body).amenity.id;
+
+  const res = await app.inject({
+    method: 'DELETE',
+    url: `/amenities/${tempAmenityId}`,
+    headers: { authorization: `Bearer ${adminToken}` },
+  });
+  assert.equal(res.statusCode, 200);
+
+  // Verify deletion
+  const getRes = await app.inject({
+    method: 'GET',
+    url: `/amenities`,
+    headers: { authorization: `Bearer ${adminToken}` },
+  });
+  const body = JSON.parse(getRes.body);
+  assert.equal(body.amenities.some((a: any) => a.id === tempAmenityId), false);
 });

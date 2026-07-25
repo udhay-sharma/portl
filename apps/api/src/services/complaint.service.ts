@@ -52,6 +52,15 @@ export async function getComplaintsBySociety(societyId: string): Promise<Complai
   });
 }
 
+export async function getUnresolvedComplaintsCountBySociety(societyId: string): Promise<number> {
+  return prisma.complaint.count({
+    where: {
+      flat: { tower: { societyId } },
+      status: { in: ['OPEN', 'IN_PROGRESS'] },
+    },
+  });
+}
+
 export async function updateComplaintStatus(
   complaintId: string,
   newStatus: 'OPEN' | 'IN_PROGRESS' | 'RESOLVED'

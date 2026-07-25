@@ -32,28 +32,64 @@ export async function getPolls(societyId: string) {
   // We can fetch votes and tally them here
   const pollIds = polls.map((p) => p.id);
   
-  // Get all votes for these polls
-  const votes = await prisma.pollVote.groupBy({
-    by: ['pollId', 'selectedOption'],
+  // Get all votes for these polls, including the user name
+  const votes = await prisma.pollVote.findMany({
     where: { pollId: { in: pollIds } },
-    _count: {
-      id: true,
-    },
+    include: {
+      user: {
+        select: { name: true }
+      }
+    }
   });
 
   // Map tallies back to polls
   return polls.map((poll) => {
     // Ensure we know it's an array of strings per our schema
     const optionsArray = (poll.options as string[]) || [];
+    const pollVotes = votes.filter((v) => v.pollId === poll.id);
+    
     const results = optionsArray.map((opt) => {
-      const voteCount = votes.find((v) => v.pollId === poll.id && v.selectedOption === opt)?._count.id || 0;
+      const voteCount = pollVotes.filter((v) => v.selectedOption === opt).length;
       return { option: opt, count: voteCount };
     });
 
     return {
       ...poll,
       results,
+      votes: pollVotes.map(v => ({
+        userId: v.userId,
+        selectedOption: v.selectedOption,
+        user: { name: v.user.name }
+      }))
     };
+  });
+}
+
+export async function updatePoll(
+  pollId: string,
+  data: Partial<CreatePollInput>
+): Promise<Poll> {
+  return prisma.poll.update({
+    where: { id: pollId },
+    data: {
+      ...(data.question && { question: data.question }),
+      ...(data.options && { options: data.options }),
+    },
+  });
+}
+
+export async function deletePoll(pollId: string): Promise<void> {
+  await prisma.poll.delete({
+    where: { id: pollId },
+  });
+}
+
+export async function endPoll(pollId: string): Promise<Poll> {
+  return prisma.poll.update({
+    where: { id: pollId },
+    data: {
+      endsAt: new Date(),
+    },
   });
 }
 
