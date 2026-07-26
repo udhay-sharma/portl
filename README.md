@@ -9,42 +9,57 @@ Portl replaces the fragmented combination of WhatsApp groups, paper registers, a
 ## Table of Contents
 
 1. [Quick Start (APK Download)](#quick-start-apk-download)
-2. [Tech Stack](#tech-stack)
-3. [Architecture Overview](#architecture-overview)
-4. [Setup & Local Development](#setup--local-development)
-5. [Demo Credentials](#demo-credentials)
-6. [Feature List](#feature-list)
-7. [Engineering Highlights](#engineering-highlights)
-8. [Known Limitations](#known-limitations)
+2. [Screenshots & Video Demo](#screenshots--video-demo)
+3. [Tech Stack](#tech-stack)
+4. [Architecture Overview](#architecture-overview)
+5. [Setup & Local Development](#setup--local-development)
+6. [Demo Credentials](#demo-credentials)
+7. [Feature List](#feature-list)
+8. [Engineering Highlights](#engineering-highlights)
+9. [Known Limitations](#known-limitations)
 
 ---
 
 ## Quick Start (APK Download)
 
-Want to test Portl immediately without setting up a development environment? 
+Want to test Portl immediately without setting up a development environment?
 
 **[Download the Standalone Android APK](https://expo.dev/artifacts/eas/iH-Pw8ufwIyKALYM1svZZw3X6sSWCJxurBYCTC65dqA.apk)**
 
-*Note: This is a standalone production build pointing directly to the live Railway backend. You can install it on any Android device. See the [Demo Credentials](#demo-credentials) section for test accounts.*
+_Note: This is a standalone production build pointing directly to the live Railway backend. You can install it on any Android device. See the [Demo Credentials](#demo-credentials) section for test accounts._
+
+---
+
+## Screenshots & Video Demo
+
+**🎥 [Watch the Video Demo (YouTube Shorts)](https://youtube.com/shorts/Zir9Kr86HME?si=lddNI9Z4a-T-XdqT)**
+
+<div style="display: flex; flex-direction: row; gap: 10px; overflow-x: auto;">
+  <img src="./docs/assets/settings.jpg" alt="Amenities" width="200" />
+  <img src="./docs/assets/poll_admin.jpg" alt="Guard Screen" width="200" />
+  <img src="./docs/assets/visitor_request.jpg" alt="Visitor Request" width="200" />
+  <img src="./docs/assets/guard_screen.jpg" alt="Admin Polls" width="200" />
+  <img src="./docs/assets/amenities.jpg" alt="Settings" width="200" />
+</div>
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| **Monorepo** | [Turborepo](https://turbo.build) + npm workspaces |
-| **Mobile** | [Expo](https://expo.dev) / React Native 0.86, [NativeWind](https://www.nativewind.dev) (TailwindCSS) |
-| **Navigation** | React Navigation 7 (native stack + bottom tabs) |
-| **API** | [Fastify](https://fastify.dev) 5 on Node.js 22 |
-| **Database** | PostgreSQL 16 via [Prisma](https://www.prisma.io) ORM |
-| **Auth** | JWT (access token), bcrypt password hashing |
-| **Real-time** | [Socket.IO](https://socket.io) 4 (visitor status push) |
-| **Background Jobs** | [BullMQ](https://bullmq.io) + Redis — visitor expiry worker, push notification worker |
-| **Push Notifications** | Expo Push Notification SDK + infrastructure (worker, token storage) |
-| **Validation** | [Zod](https://zod.dev) schemas in `@portl/shared` package, shared between API and mobile |
-| **Production** | [Railway](https://railway.app) (API + PostgreSQL + Redis) |
-| **Build** | [EAS Build](https://expo.dev/eas) — `preview` profile outputs a standalone APK |
+| Layer                  | Technology                                                                                           |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| **Monorepo**           | [Turborepo](https://turbo.build) + npm workspaces                                                    |
+| **Mobile**             | [Expo](https://expo.dev) / React Native 0.86, [NativeWind](https://www.nativewind.dev) (TailwindCSS) |
+| **Navigation**         | React Navigation 7 (native stack + bottom tabs)                                                      |
+| **API**                | [Fastify](https://fastify.dev) 5 on Node.js 22                                                       |
+| **Database**           | PostgreSQL 16 via [Prisma](https://www.prisma.io) ORM                                                |
+| **Auth**               | JWT (access token), bcrypt password hashing                                                          |
+| **Real-time**          | [Socket.IO](https://socket.io) 4 (visitor status push)                                               |
+| **Background Jobs**    | [BullMQ](https://bullmq.io) + Redis — visitor expiry worker, push notification worker                |
+| **Push Notifications** | Expo Push Notification SDK + infrastructure (worker, token storage)                                  |
+| **Validation**         | [Zod](https://zod.dev) schemas in `@portl/shared` package, shared between API and mobile             |
+| **Production**         | [Railway](https://railway.app) (API + PostgreSQL + Redis)                                            |
+| **Build**              | [EAS Build](https://expo.dev/eas) — `preview` profile outputs a standalone APK                       |
 
 ---
 
@@ -146,11 +161,11 @@ This runs 15 test files covering auth, RBAC, seed integrity, visitor state machi
 
 All three roles belong to the same seeded society ("Portl Seed Society") and share a single password:
 
-| Role | Email | Password |
-|---|---|---|
+| Role         | Email                | Password      |
+| ------------ | -------------------- | ------------- |
 | **Resident** | `resident@portl.dev` | `password123` |
-| **Guard** | `guard@portl.dev` | `password123` |
-| **Admin** | `admin@portl.dev` | `password123` |
+| **Guard**    | `guard@portl.dev`    | `password123` |
+| **Admin**    | `admin@portl.dev`    | `password123` |
 
 The production Railway database is pre-seeded with these credentials.
 
