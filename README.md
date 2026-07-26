@@ -1,159 +1,243 @@
-# Turborepo starter
+# Portl
 
-This Turborepo starter is maintained by the Turborepo core team.
+**Society gate management and community operations — in one app.**
 
-## Using this example
+Portl replaces the fragmented combination of WhatsApp groups, paper registers, and manual phone calls that most residential societies use today. Guards log visitors digitally, residents approve or reject entry from their phone, and admins manage notices, polls, complaints, amenities, and staff from a single dashboard. Everything is scoped by society and role — no data bleeds across tenants.
 
-Run the following command:
+---
 
-```sh
-npx create-turbo@latest
+## Table of Contents
+
+1. [Quick Start (APK Download)](#quick-start-apk-download)
+2. [Tech Stack](#tech-stack)
+3. [Architecture Overview](#architecture-overview)
+4. [Setup & Local Development](#setup--local-development)
+5. [Demo Credentials](#demo-credentials)
+6. [Feature List](#feature-list)
+7. [Engineering Highlights](#engineering-highlights)
+8. [Known Limitations](#known-limitations)
+
+---
+
+## Quick Start (APK Download)
+
+Want to test Portl immediately without setting up a development environment? 
+
+**[Download the Standalone Android APK](https://expo.dev/artifacts/eas/iH-Pw8ufwIyKALYM1svZZw3X6sSWCJxurBYCTC65dqA.apk)**
+
+*Note: This is a standalone production build pointing directly to the live Railway backend. You can install it on any Android device. See the [Demo Credentials](#demo-credentials) section for test accounts.*
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| **Monorepo** | [Turborepo](https://turbo.build) + npm workspaces |
+| **Mobile** | [Expo](https://expo.dev) / React Native 0.86, [NativeWind](https://www.nativewind.dev) (TailwindCSS) |
+| **Navigation** | React Navigation 7 (native stack + bottom tabs) |
+| **API** | [Fastify](https://fastify.dev) 5 on Node.js 22 |
+| **Database** | PostgreSQL 16 via [Prisma](https://www.prisma.io) ORM |
+| **Auth** | JWT (access token), bcrypt password hashing |
+| **Real-time** | [Socket.IO](https://socket.io) 4 (visitor status push) |
+| **Background Jobs** | [BullMQ](https://bullmq.io) + Redis — visitor expiry worker, push notification worker |
+| **Push Notifications** | Expo Push Notification SDK + infrastructure (worker, token storage) |
+| **Validation** | [Zod](https://zod.dev) schemas in `@portl/shared` package, shared between API and mobile |
+| **Production** | [Railway](https://railway.app) (API + PostgreSQL + Redis) |
+| **Build** | [EAS Build](https://expo.dev/eas) — `preview` profile outputs a standalone APK |
+
+---
+
+## Architecture Overview
+
+```
+portl/
+├── apps/
+│   ├── api/          # Fastify REST API + Socket.IO + BullMQ workers
+│   └── mobile/       # Expo React Native app (Android + iOS)
+├── packages/
+│   └── shared/       # Zod schemas, TypeScript types shared across apps
+├── turbo.json
+└── package.json
 ```
 
-## What's inside?
+The `@portl/shared` package ensures that request/response validation schemas are defined once and consumed by both the API (runtime validation) and the mobile app (TypeScript types). There is no type drift between client and server.
 
-This Turborepo includes the following packages/apps:
+---
 
-### Apps and Packages
+## Setup & Local Development
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+### Prerequisites
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+- Node.js ≥ 22
+- npm ≥ 11
+- PostgreSQL 16 (local or remote)
+- Redis 7 (local — required for BullMQ background workers)
+- [EAS CLI](https://docs.expo.dev/eas/) for building the APK (`npm install -g eas-cli`)
 
-### Utilities
+### 1. Install Dependencies
 
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```bash
+npm install
 ```
 
-Without global `turbo`, use your package manager:
+### 2. Configure the API
 
-```sh
-cd my-turborepo
-npx turbo build
-npm dlx turbo build
-npm exec turbo build
+Create `apps/api/.env`:
+
+```env
+DATABASE_URL="postgresql://user:password@localhost:5432/portl"
+JWT_SECRET="your-secret-key-here"
+REDIS_URL="redis://localhost:6379"
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+### 3. Run Migrations and Seed
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+```bash
+cd apps/api
 
-```sh
-turbo build --filter=docs
+# Apply all migrations
+npx prisma migrate deploy
+
+# Seed with demo society, users, amenities, and staff
+npx prisma db seed
 ```
 
-Without global `turbo`:
+### 4. Start the API
 
-```sh
-npx turbo build --filter=docs
-npm exec turbo build --filter=docs
-npm exec turbo build --filter=docs
+```bash
+cd apps/api
+npm run dev
 ```
 
-### Develop
+The API will start on `http://localhost:3000`.
 
-To develop all apps and packages, run the following command:
+### 5. Configure and Start the Mobile App
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+Create `apps/mobile/.env`:
 
-```sh
-cd my-turborepo
-turbo dev
+```env
+# For local development, leave this unset — the app auto-detects your LAN IP via Expo
+# For production builds, set this to the Railway URL:
+# EXPO_PUBLIC_API_URL=https://portlapi-production.up.railway.app
 ```
 
-Without global `turbo`, use your package manager:
+Then start the Expo dev server:
 
-```sh
-cd my-turborepo
-npx turbo dev
-npm exec turbo dev
-npm exec turbo dev
+```bash
+cd apps/mobile
+npx expo start --clear
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+Scan the QR code with Expo Go on your device, or press `a` to open in an Android emulator.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+### 6. Run the Test Suite
 
-```sh
-turbo dev --filter=web
+```bash
+cd apps/api
+npm test
 ```
 
-Without global `turbo`:
+This runs 15 test files covering auth, RBAC, seed integrity, visitor state machine, double-booking lock, Socket.IO events, idempotency, and all domain routes.
 
-```sh
-npx turbo dev --filter=web
-npm exec turbo dev --filter=web
-npm exec turbo dev --filter=web
-```
+---
 
-### Remote Caching
+## Demo Credentials
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+All three roles belong to the same seeded society ("Portl Seed Society") and share a single password:
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+| Role | Email | Password |
+|---|---|---|
+| **Resident** | `resident@portl.dev` | `password123` |
+| **Guard** | `guard@portl.dev` | `password123` |
+| **Admin** | `admin@portl.dev` | `password123` |
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+The production Railway database is pre-seeded with these credentials.
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
+---
 
-```sh
-cd my-turborepo
-turbo login
-```
+## Feature List
 
-Without global `turbo`, use your package manager:
+### 🏠 Resident
 
-```sh
-cd my-turborepo
-npx turbo login
-npm exec turbo login
-npm exec turbo login
-```
+- **Visitor approvals** — Approve or reject pending visitor requests in real time; status updates are pushed via Socket.IO without requiring a manual refresh
+- **Visitor history** — Full log of all approved, rejected, checked-in, and checked-out visitors for the resident's flat
+- **Polls** — Vote on active community polls; results update live with vote-count progress bars; voted polls are tracked client-side to prevent duplicate submissions
+- **Notices** — Read society-wide announcements published by Admin
+- **Complaints** — Submit complaints with title and description; track status (Open → In Progress → Resolved)
+- **Amenity booking** — Browse available amenities, view time-slot availability for a given date, and book a slot (double-booking is prevented at the database transaction layer)
+- **My Bookings** — View all upcoming and past amenity bookings
+- **Staff directory** — Read-only access to the society's service provider directory
+- **Tab badges** — Unread counts on visitor requests, notices, polls, and complaints automatically refresh on focus
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
+### 🛡️ Guard
 
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
+- **Create visitor requests** — Search for a resident's flat by flat number or tower, select it, and log a visitor with name, purpose, and visitor type
+- **Visitor history** — Full log of all visitor requests created by the guard's gate, including current status
+- **Mark exit** — One-tap "Mark Exit" to transition approved/checked-in visitors to `CHECKED_OUT`
+- **My gate** — All guard actions are scoped to the guard's assigned gate
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+### 👑 Admin
 
-```sh
-turbo link
-```
+- **Notices** — Create and publish society-wide notices; all residents see them immediately
+- **Polls** — Create polls with up to 10 options; edit question and options; end a poll to declare the result (winning option highlighted); view the full voter breakdown (who voted for what); delete polls
+- **Complaints** — View all complaints from all flats; update status from Open → In Progress → Resolved; unread complaint badge on the tab
+- **Amenities** — Full CRUD: create amenities with name, description, and slot duration; edit and delete existing amenities
+- **Staff directory** — Full CRUD: add, edit, and remove service providers (plumbers, electricians, cleaners, etc.)
+- **Settings** — Access to app settings from a gear icon in every screen header
 
-Without global `turbo`:
+### 🔐 Shared / Auth
 
-```sh
-npx turbo link
-npm exec turbo link
-npm exec turbo link
-```
+- **JWT authentication** — All API routes are protected; tokens are stored in Expo SecureStore and cleared on logout
+- **Role-based access control** — RESIDENT, GUARD, and ADMIN roles enforced at the API middleware layer; role-scoped navigation trees in the app
+- **Auto-login** — Token persisted across app restarts; redirects to the correct tab navigator for the user's role on resume
+- **Real-time updates** — Socket.IO room scoped by `societyId`; visitor status changes are broadcast to connected residents without polling
+- **Background workers** — BullMQ + Redis runs two workers:
+  - **Expiry worker**: automatically marks stale `PENDING` visitor requests as `EXPIRED` after 5 minutes
+  - **Push worker**: delivers push notifications to residents when a visitor request is created for their flat
+- **Expo push notification infrastructure** — Push tokens are registered and stored per-user; the server-side worker dispatches notifications via the Expo Push API
 
-## Useful Links
+---
 
-Learn more about the power of Turborepo:
+## Engineering Highlights
 
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
+**Database-level concurrency constraints, not application-level.**  
+Amenity double-booking is prevented inside a `prisma.$transaction` with a `SELECT FOR UPDATE` lock — not with a pre-check query that would lose a race condition. The `PollVote` table has a `@@unique([pollId, userId])` constraint enforced by the database, so the "one vote per user per poll" rule holds even under concurrent requests.
+
+**Idempotency on visitor status transitions.**  
+The `PATCH /visitor-requests/:id` endpoint accepts an optional `idempotencyKey`. If the same key is submitted twice, the second request returns the same result as the first without creating duplicate state transitions. The audit trail (`ApprovalDecision` table) is append-only — each status change creates a new row recording who changed what and when, never updating in place.
+
+**Zod schemas are the single source of truth.**  
+Validation schemas in `@portl/shared` are referenced by both the Fastify route handlers (runtime validation) and the mobile app (TypeScript types). Adding a field to a schema surfaces type errors in both apps at compile time.
+
+**15 automated test files.**  
+The API test suite covers: seed integrity, login flows, RBAC enforcement for all three roles, visitor creation, the full visitor state machine, optimistic lock behaviour, Socket.IO event emission, idempotency, and all domain routes (notices, polls, complaints, amenities, flats, staff). Tests run against a real local PostgreSQL instance using deterministic seed IDs.
+
+**Production deployment on Railway.**  
+The API, PostgreSQL, and Redis are deployed to Railway. EAS Build produces a standalone APK pointed at the Railway backend — the APK requires no dev server or local machine to function after installation.
+
+**Audit trail by design.**  
+The `ApprovalDecision` model is append-only. The decision to never update a row means the full history of every visitor's status transitions is preserved and queryable, with the deciding user recorded on each row.
+
+---
+
+## Known Limitations
+
+**Society/tower/flat/user management is seed-only.**  
+The Admin UI provides CRUD for notices, polls, complaints, amenities, and staff. Adding new towers, flats, or user accounts to a society requires running the seed script or making direct database changes. An Admin management UI for the society hierarchy is a natural next scope.
+
+**Push notifications require Firebase/FCM configuration.**  
+The full push infrastructure is implemented and running (token storage, BullMQ worker, Expo Push API calls). On Android, Expo's push service routes notifications through Firebase Cloud Messaging, which requires a `google-services.json` file and a configured FCM project. This has not been set up for this build. The worker runs, tokens are stored, and the Expo API is called — notifications will deliver correctly once FCM is configured.
+
+**Guest pre-approval and delivery-specific flows use the generic visitor flow.**  
+There is a single visitor type field on each request. Residents cannot pre-approve a guest with a time window before the visitor arrives. Delivery-specific workflows (one-time OTP, automatic expiry on first check-in) are not differentiated from general visitor visits. Both are deliberate scope boundaries for this build.
+
+**Amenity booking's "today" filter has a UTC/IST timezone boundary edge case.**  
+Slot availability is computed by filtering bookings where `date` matches today. The `date` field is stored as a UTC timestamp. Between midnight IST (18:30 UTC the previous day) and midnight UTC, the "today" filter can return stale results. The fix — storing dates as `YYYY-MM-DD` strings or applying a timezone offset at query time — is straightforward and is the only known data edge case.
+
+---
+
+## Project Links
+
+- **Live API:** https://portlapi-production.up.railway.app/health
+- **GitHub:** https://github.com/udhay-sharma/portl
