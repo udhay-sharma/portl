@@ -24,9 +24,9 @@ Portl replaces the fragmented combination of WhatsApp groups, paper registers, a
 
 Want to test Portl immediately without setting up a development environment?
 
-**[Download the Standalone Android APK](https://expo.dev/artifacts/eas/iH-Pw8ufwIyKALYM1svZZw3X6sSWCJxurBYCTC65dqA.apk)**
+**[Download the Standalone Android APK](https://github.com/udhay-sharma/portl/releases/latest)**
 
-_Note: This is a standalone production build pointing directly to the live Railway backend. You can install it on any Android device. See the [Demo Credentials](#demo-credentials) section for test accounts._
+_Note: This is a standalone preview build pointing directly to the live Railway backend. You can install it on any Android device. See the [Demo Credentials](#demo-credentials) section for test accounts._
 
 ---
 
@@ -180,7 +180,7 @@ The production Railway database is pre-seeded with these credentials.
 - **Polls** — Vote on active community polls; results update live with vote-count progress bars; voted polls are tracked client-side to prevent duplicate submissions
 - **Notices** — Read society-wide announcements published by Admin
 - **Complaints** — Submit complaints with title and description; track status (Open → In Progress → Resolved)
-- **Amenity booking** — Browse available amenities, view time-slot availability for a given date, and book a slot (double-booking is prevented at the database transaction layer)
+- **Amenity booking** — Browse available amenities, view time-slot availability for a given date, and book a slot (double-booking is prevented by a database-level exclusion constraint)
 - **My Bookings** — View all upcoming and past amenity bookings
 - **Staff directory** — Read-only access to the society's service provider directory
 - **Tab badges** — Unread counts on visitor requests, notices, polls, and complaints automatically refresh on focus
@@ -217,7 +217,7 @@ The production Railway database is pre-seeded with these credentials.
 ## Engineering Highlights
 
 **Database-level concurrency constraints, not application-level.**  
-Amenity double-booking is prevented inside a `prisma.$transaction` with a `SELECT FOR UPDATE` lock — not with a pre-check query that would lose a race condition. The `PollVote` table has a `@@unique([pollId, userId])` constraint enforced by the database, so the "one vote per user per poll" rule holds even under concurrent requests.
+Amenity double-booking is prevented by a PostgreSQL `EXCLUDE USING gist` constraint on the amenity ID and the booking time range (via the `btree_gist` extension), so overlapping slots are rejected by the database engine itself, even under concurrent requests. The `PollVote` table has a `@@unique([pollId, userId])` constraint, so the "one vote per user per poll" rule is also enforced by the database.
 
 **Idempotency on visitor status transitions.**  
 The `PATCH /visitor-requests/:id` endpoint accepts an optional `idempotencyKey`. If the same key is submitted twice, the second request returns the same result as the first without creating duplicate state transitions. The audit trail (`ApprovalDecision` table) is append-only — each status change creates a new row recording who changed what and when, never updating in place.
@@ -256,3 +256,9 @@ Slot availability is computed by filtering bookings where `date` matches today. 
 
 - **Live API:** https://portlapi-production.up.railway.app/health
 - **GitHub:** https://github.com/udhay-sharma/portl
+
+## Author
+
+Built by **Udhay Sharma** — [GitHub](https://github.com/udhay-sharma) · [LinkedIn](https://linkedin.com/in/udhay-sharma-52bb77359/) · [X](https://x.com/Udhay_911)
+
+Licensed under the MIT License. See [LICENSE](./LICENSE).
