@@ -26,7 +26,7 @@ Want to test Portl immediately without setting up a development environment?
 
 **[Download the Standalone Android APK](https://github.com/udhay-sharma/portl/releases/latest)**
 
-_Note: This is a standalone preview build pointing directly to the live Railway backend. You can install it on any Android device. See the [Demo Credentials](#demo-credentials) section for test accounts._
+_Note: This is a standalone preview build pointing directly to the live Railway backend. You can install it on any Android device. Pick a role on the login screen and tap **Try the demo account** to sign in without typing credentials, or see [Demo Credentials](#demo-credentials)._
 
 ---
 
@@ -167,7 +167,7 @@ All three roles belong to the same seeded society ("Portl Seed Society") and sha
 | **Guard**    | `guard@portl.dev`    | `password123` |
 | **Admin**    | `admin@portl.dev`    | `password123` |
 
-The production Railway database is pre-seeded with these credentials.
+The production Railway database is pre-seeded with these credentials. In the app, you can skip typing them: select a role on the login screen and tap **Try the demo account**.
 
 ---
 
@@ -203,9 +203,10 @@ The production Railway database is pre-seeded with these credentials.
 
 ### 🔐 Shared / Auth
 
+- **Role-aware login** — Choose Resident, Guard, or Admin on the login screen; the screen takes on that role's colour, offers one-tap demo sign-in, and shows a clear message (with a one-tap switch) if the account belongs to a different role. The role still comes from the account, never from the selector
 - **JWT authentication** — All API routes are protected; tokens are stored in Expo SecureStore and cleared on logout
 - **Role-based access control** — RESIDENT, GUARD, and ADMIN roles enforced at the API middleware layer; role-scoped navigation trees in the app
-- **Auto-login** — Token persisted across app restarts; redirects to the correct tab navigator for the user's role on resume
+- **Auto-login** — Token persisted across app restarts; on resume the full profile is reloaded from `GET /me` and the user lands on the correct tab navigator for their role
 - **Real-time updates** — Socket.IO room scoped by `societyId`; visitor status changes are broadcast to connected residents without polling
 - **Background workers** — BullMQ + Redis runs two workers:
   - **Expiry worker**: automatically marks stale `PENDING` visitor requests as `EXPIRED` after 5 minutes
