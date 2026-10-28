@@ -67,7 +67,7 @@ export interface LoginResponse {
   user: UserProfile;
 }
 
-export async function getMe(token: string): Promise<{ id: string; role: string; societyId: string }> {
+export async function getMe(token: string): Promise<UserProfile> {
   const res = await fetch(`${API_BASE_URL}/me`, {
     headers: { Authorization: `Bearer ${token}` },
   });
