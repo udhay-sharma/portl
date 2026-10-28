@@ -8,8 +8,15 @@ interface AuthContextType {
   token: string | null;
   user: UserProfile | null;
   isLoading: boolean;
-  login: (credential: string, password?: string) => Promise<void>;
+  login: (credential: string, password?: string, expectedRole?: UserProfile['role']) => Promise<void>;
   logout: () => Promise<void>;
+}
+
+// Thrown when the account's role differs from the role picked on the login screen
+export class RoleMismatchError extends Error {
+  constructor(public actualRole: UserProfile['role']) {
+    super(`This account is registered as a ${actualRole.charAt(0) + actualRole.slice(1).toLowerCase()}.`);
+  }
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,23 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const storedToken = await SecureStore.getItemAsync('accessToken');
         if (storedToken) {
-          // Verify token and fetch user details
-          // Since getMe only returns a partial user currently, we cast or assume for now,
-          // but let's actually just fetch it to verify the token is valid.
-          const partialUser = await getMe(storedToken);
+          // Verify token and restore the full profile (same /me call used by login)
+          const me = await getMe(storedToken);
           setToken(storedToken);
-          // In a full implementation, GET /me should return the full UserProfile.
-          // For now, we populate what we have to satisfy the type or just leave it null until LoginScreen is built.
-          setUser({
-            id: partialUser.id,
-            role: partialUser.role as any,
-            societyId: partialUser.societyId,
-            name: 'Stored User', // Placeholder since getMe might not return it yet
-            email: null,
-            phone: null,
-            flatId: null,
-            gateId: null,
-          });
+          setUser(me);
         }
       } catch (err) {
         // If getMe fails (e.g. 401 Expired), we clear the token.
@@ -72,11 +66,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadToken();
   }, []);
 
-  const login = async (credential: string, password?: string) => {
+  const login = async (credential: string, password?: string, expectedRole?: UserProfile['role']) => {
     let accessToken = '';
-    
+
     // Perform login API call
     const res = await apiLogin(credential, password);
+    // Reject before storing the token so a mismatch never leaves a half-logged-in session
+    if (expectedRole && res.user.role !== expectedRole) {
+      throw new RoleMismatchError(res.user.role);
+    }
     await SecureStore.setItemAsync('accessToken', res.accessToken);
     accessToken = res.accessToken;
     setToken(res.accessToken);
